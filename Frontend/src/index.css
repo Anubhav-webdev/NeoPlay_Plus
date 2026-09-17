@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Lobster+Two:ital@1&family=Orbitron:wght@400..900&family=Splash&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lobster+Two:ital@1&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Splash&display=swap');
+
+:root {
+  color-scheme: dark;
+  --neo-bg: #070B14;
+  --neo-bg-surface: #0B1220;
+  --neo-panel: #111827;
+  --neo-border: #1B2430;
+  --neo-text: #F8FAFC;
+  --neo-muted: #CBD5E1;
+  --neo-secondary-text: #94A3B8;
+  --neo-primary: #00E5FF;
+  --neo-secondary: #7C3AED;
+  --neo-success: #10B981;
+  --neo-shadow: 0 24px 90px rgba(0, 0, 0, 0.35);
+}
+
+.title-font {
+  font-family: "Bebas Neue", sans-serif;
+}
+
+.sidebar-font {
+  font-family: "Lobster Two", cursive;
+}
+.all-font {
+  font-family: "Roboto",
+}
+.header-font {
+  font-family: "Orbitron", "Lobster Two";
+}
+
+@import "tailwindcss";
+
+@keyframes subscribe-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.85);
+  }
+  70% {
+    transform: translateY(-0.15rem) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(2.75rem) rotate(var(--confetti-rotation));
+  }
+}
+
+@keyframes party-overlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes button-celebrate {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.12) rotate(-2deg); }
+  65% { transform: scale(0.96) rotate(2deg); }
+}
+
+@keyframes party-card {
+  0% { opacity: 0; transform: scale(0.45) rotate(-8deg); }
+  70% { transform: scale(1.08) rotate(2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes party-blast {
+  0% { opacity: 1; transform: translate(-50%, -50%) rotate(0); }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--blast-x)), calc(-50% + var(--blast-y))) rotate(var(--confetti-rotation)) scale(0.7);
+  }
+}
+
+
+::-webkit-scrollbar{
+  display: none;
+}
+
+
+
+
+
+
+
+
+
+
+
+

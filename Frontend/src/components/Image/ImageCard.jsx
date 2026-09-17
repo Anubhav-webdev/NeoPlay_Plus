@@ -1,0 +1,140 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { FiCheck, FiHeart, FiX } from "react-icons/fi";
+
+export default function ImageCard({
+  image,
+  className = "",
+  liked: controlledLiked,
+  onLike,
+}) {
+  const [localLiked, setLocalLiked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const imageSource = image.thumb || image.src || image.url;
+  const liked = controlledLiked ?? localLiked;
+
+  // Prevent background scrolling when fullscreen is active
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+          document.body.style.overflow = "";
+    };
+  }, [isFullscreen]);
+
+  const handleLike = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setLocalLiked((value) => !value);
+    onLike?.(!liked);
+  };
+
+  const openFullscreen = () => {
+    setIsFullscreen(true);
+  };
+
+  return (
+    <>
+      <div
+        className={`group relative block min-h-48 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 shadow-lg transition duration-500 hover:-translate-y-1 hover:border-amber-300/50 hover:shadow-2xl hover:shadow-black/40 ${className}`}
+      >
+        <div className="relative w-full h-full overflow-hidden">
+          
+          {/* Image Trigger for Fullscreen */}
+          <button
+            type="button"
+            onClick={openFullscreen} 
+            aria-label={`Preview ${image.title}`}
+            className="h-full w-full cursor-zoom-in text-left"
+          >
+            <img
+              src={imageSource}
+              alt={image.title || "Image preview"}
+              loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            />
+          </button>
+
+          {/* Hover Gradient Overlay */}
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(10,13,19,0) 40%, rgba(10,13,19,0.95) 100%)",
+            }}
+          >
+           
+
+            {/* Creator with Delayed Slide-up Animation */}
+
+          </div>
+
+          {/* Floating Like Button */}
+          <button
+            onClick={handleLike}
+            aria-label="Like image"
+            className={`absolute top-3 right-3 h-9 w-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300 shadow-md transform hover:scale-115 active:scale-95 z-10 ${
+              liked 
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 opacity-100" 
+                : "bg-black/40 text-white border border-white/10 opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            {liked ? (
+              <FiCheck className="text-base animate-pulse" />
+            ) : (
+              <FiHeart className="text-base transition-transform duration-200 hover:text-red-400" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* --- Fullscreen Modal --- */}
+      {isFullscreen && createPortal(
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-10 bg-black/95 backdrop-blur-xl transition-all duration-300 animate-fade-in"
+          onClick={() => setIsFullscreen(false)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="absolute top-6 right-6 text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 p-2.5 rounded-full backdrop-blur-md transition-all duration-200 z-50 border border-white/10"
+          >
+            <FiX size={24} />
+          </button>
+
+          {/* Fullscreen Image Container */}
+        <div
+  className="relative max-w-7xl max-h-[85vh] overflow-hidden rounded-2xl bg-neutral-900 border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.7)] animate-scale-up"
+  onClick={(e) => e.stopPropagation()}
+>
+  <img
+    src={imageSource}
+    alt={image.title || "Image preview"}
+    className="w-full h-full max-h-[85vh] object-contain"
+  />
+
+  {/*icon */}
+  <div className="absolute top-5 right-2  text-white/50  text-xl font-semibold flex gap-1  sidebar-font">
+    NeoOriginals+
+  </div>
+
+  {/* Image Info */}
+          <div className="absolute bottom-0 inset-x-0 p-4 bg-linear-to-t from-black/80 to-transparent flex items-center justify-between">
+
+              <div>
+
+                <h3 className="text-white font-medium text-base md:text-lg">{image.title}</h3>
+
+                <p className="text-neutral-400 text-xs md:text-sm border-l-2 border-amber-500 pl-2">by {image.channel}</p>
+
+              </div>
+</div>
+        </div>
+        </div>
+      , document.body)}
+    </>
+  );
+}
