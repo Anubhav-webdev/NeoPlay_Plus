@@ -42,12 +42,17 @@ export const createMediaUpload = asyncHandler(async (req, res) => {
     if (!fileType || !mediaType) {
       throw new ApiError(415, "Unsupported or unrecognized media file contents");
     }
+<<<<<<< HEAD
     
     if (
       req.file.mimetype !== fileType.mime ||
       !validateMediaType(fileType.mime, req.file.originalname, mediaType)
     ) {
       throw new ApiError(415, "File extension and declared MIME type must match the actual file");
+=======
+    if (!validateMediaType(fileType.mime, req.file.originalname, mediaType)) {
+      throw new ApiError(415, "File extension does not match the actual media contents");
+>>>>>>> 745911a3b74bbdb7d5aa188e1a24a4c1a5f8a804
     }
 
     const creatorId = req.creator?._id;

@@ -9,7 +9,10 @@ export default function IdentitySuite({
   setIsEditingProfileText, 
   wallpaperInputRef, 
   avatarInputRef, 
-  executeProfileImageUpload 
+  executeProfileImageUpload,
+  onSaveProfile,
+  isSavingProfile = false,
+  isUploadingProfileImage = false,
 }) {
   return (
     <motion.div 
@@ -24,12 +27,12 @@ export default function IdentitySuite({
         <div className="absolute inset-0 " />
         <div 
           className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center cursor-pointer" 
-          onClick={() => wallpaperInputRef.current.click()}
+          onClick={() => !isUploadingProfileImage && wallpaperInputRef.current?.click()}
         >
           <Sliders className="w-5 h-5 text-purple-400 mr-2" />
-          <span className="text-xs font-bold uppercase tracking-widest text-white">Modify Studio Wallpaper</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-white">{isUploadingProfileImage ? "Saving profile image..." : "Modify Studio Wallpaper"}</span>
         </div>
-        <input type="file" ref={wallpaperInputRef} accept="image/*" onChange={(e) => executeProfileImageUpload(e, 'wallpaper')} className="hidden" />
+        <input type="file" ref={wallpaperInputRef} accept="image/jpeg,image/png,image/webp" disabled={isUploadingProfileImage} onChange={(e) => executeProfileImageUpload(e, "wallpaper")} className="hidden" />
       </div>
 
       {/* Profile Details Layout */}
@@ -40,22 +43,22 @@ export default function IdentitySuite({
               <img src={channelIdentity.avatar} alt="Avatar Node" className="w-full h-full object-cover" />
               <div 
                 className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center cursor-pointer" 
-                onClick={() => avatarInputRef.current.click()}
+                onClick={() => !isUploadingProfileImage && avatarInputRef.current?.click()}
               >
                 <UploadCloud className="w-5 h-5 text-white" />
               </div>
             </div>
-            <input type="file" ref={avatarInputRef} accept="image/*" onChange={(e) => executeProfileImageUpload(e, 'avatar')} className="hidden" />
+            <input type="file" ref={avatarInputRef} accept="image/jpeg,image/png,image/webp" disabled={isUploadingProfileImage} onChange={(e) => executeProfileImageUpload(e, "avatar")} className="hidden" />
           </div>
 
           <div className="pt-2 sm:pt-6">
             {isEditingProfileText ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 max-w-sm">
                 <input type="text" value={channelIdentity.name} onChange={(e) => setChannelIdentity({ ...channelIdentity, name: e.target.value })} className="bg-slate-950 border border-slate-800 text-sm px-3 py-1.5 rounded-xl text-white w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Creator Name" />
-                <input type="text" value={channelIdentity.username} onChange={(e) => setChannelIdentity({ ...channelIdentity, username: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-400 w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Handle" />
-                <input type="text" value={channelIdentity.tagline} onChange={(e) => setChannelIdentity({ ...channelIdentity, tagline: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-purple-400 w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Tagline description" />
-                <textarea value={channelIdentity.about} onChange={(e) => setChannelIdentity({ ...channelIdentity, about: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-400 w-full focus:outline-none focus:border-purple-500 transition-colors resize-none h-16" placeholder="About" />
-                <button onClick={() => setIsEditingProfileText(false)} className="bg-purple-600 hover:bg-purple-500 px-4 py-1.5 text-[10px] uppercase tracking-widest font-black text-white rounded-xl transition-all">Commit Profile Changes</button>
+                <input type="text" value={channelIdentity.username} readOnly className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-500 w-full focus:outline-none" aria-label="Account handle" />
+                <input type="text" maxLength={160} value={channelIdentity.tagline} onChange={(e) => setChannelIdentity({ ...channelIdentity, tagline: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-purple-400 w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Tagline" />
+                <textarea maxLength={2000} value={channelIdentity.about} onChange={(e) => setChannelIdentity({ ...channelIdentity, about: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-400 w-full focus:outline-none focus:border-purple-500 transition-colors resize-none h-16" placeholder="About" />
+                <button type="button" onClick={onSaveProfile} disabled={isSavingProfile || isUploadingProfileImage} className="bg-purple-600 hover:bg-purple-500 px-4 py-1.5 text-[10px] uppercase tracking-widest font-black text-white rounded-xl transition-all disabled:opacity-60">{isSavingProfile ? "Saving..." : "Save Profile"}</button>
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -71,7 +74,7 @@ export default function IdentitySuite({
           </div>
         </div>
 
-        <button onClick={() => setIsEditingProfileText(!isEditingProfileText)} className="px-4 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-purple-300 border border-slate-800/80 hover:border-purple-500/40 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 self-end sm:self-center shadow-inner">
+        <button disabled={isSavingProfile || isUploadingProfileImage} onClick={() => setIsEditingProfileText(!isEditingProfileText)} className="px-4 py-2.5 bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-purple-300 border border-slate-800/80 hover:border-purple-500/40 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 self-end sm:self-center shadow-inner">
           <Edit2 className="w-3.5 h-3.5" />Edit Profile
         </button>
       </div>

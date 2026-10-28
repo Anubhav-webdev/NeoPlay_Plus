@@ -18,12 +18,12 @@ separate worker must be running for uploads to move beyond the queued state.
 3. Set `DB_URL`, `DB_NAME`, token secrets, `REDIS_URL`, and the Cloudinary
    credentials in `.env`. Keep this file private. `MEDIA_TEMP_DIR` must be a
    writable directory with enough space for the upload and converted file.
-4. Start the API and worker in separate terminals:
+4. Start development mode from the Backend directory:
 
-   ```powershell
-   npm run dev
-   npm run worker
-   ```
+   Run npm run dev. This starts both the API and the media worker.
+   The API requires MongoDB. Media processing requires Redis and Cloudinary credentials. In production, run the API with
+   npm start and the worker with npm run worker as separate long-running
+   processes.
 
    If the API and worker run on separate machines, they must share the same
    `MEDIA_TEMP_DIR` path and contents because queued jobs refer to staged files.

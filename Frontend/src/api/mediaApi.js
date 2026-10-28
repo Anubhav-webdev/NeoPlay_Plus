@@ -66,6 +66,25 @@ export async function getMyCreatorProfile({ signal } = {}) {
   return result.data.creator;
 }
 
+export async function updateMyCreatorProfile(profile) {
+  const result = await apiFetch("/creators/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  });
+  return result.data.creator;
+}
+
+export async function uploadCreatorProfileImage(file, imageType) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const result = await apiFetch(
+    "/creators/me/images/" + encodeURIComponent(imageType),
+    { method: "POST", body: formData },
+  );
+  return result.data.creator;
+}
+
 export async function getMyCreatorAnalytics({ signal } = {}) {
   const result = await apiFetch("/creators/me/analytics", { signal });
   return result.data;

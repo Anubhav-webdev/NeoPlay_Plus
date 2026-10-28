@@ -133,6 +133,9 @@ export default function CreatorProfile() {
     name: creator.displayName,
     handle: creator.displayName.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
     avatar: creator.avatar,
+    banner: creator.banner,
+    tagline: creator.tagline,
+    bio: creator.about,
     createdAt: creator.createdAt,
   };
 
