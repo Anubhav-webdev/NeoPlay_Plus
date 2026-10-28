@@ -119,12 +119,25 @@ export async function uploadMedia(file) {
 // Video work runs in a separate worker, so the UI polls the owner-scoped status endpoint.
 export async function waitForMediaUpload(uploadId, onStatus = () => {}) {
   const deadline = Date.now() + 10 * 60 * 1000;
+  const startedAt = Date.now();
+  const statusMessages = {
+    receiving: "Upload received; waiting for the media worker.",
+    queued: "Upload queued for verification.",
+    checking: "Checking the file and looking for duplicates.",
+    processing: "Processing media on the server.",
+  };
+
   while (Date.now() < deadline) {
     const result = await apiFetch(
-      `/media/uploads/${encodeURIComponent(uploadId)}`
+      "/media/uploads/" + encodeURIComponent(uploadId),
+      { cache: "no-store" },
     );
     const upload = result.data.upload;
-    onStatus(upload.status);
+    const elapsedMs = Date.now() - startedAt;
+    const message = upload.status === "queued" && elapsedMs >= 60_000
+      ? "Still queued. The media worker may be offline or busy; keep it running with Redis."
+      : statusMessages[upload.status] || upload.status;
+    onStatus(message);
 
     if (upload.status === "ready") return upload;
     if (upload.status === "review_required") {
@@ -147,10 +160,9 @@ export async function waitForMediaUpload(uploadId, onStatus = () => {}) {
     await new Promise((resolve) => window.setTimeout(resolve, 2000));
   }
   throw new Error(
-    `Upload ${uploadId} is still processing. Check its status later.`
+    "Upload is still processing. Check that the media worker and Redis are running."
   );
 }
-
 export async function createContent(payload) {
   const result = await apiFetch("/content", {
     method: "POST",

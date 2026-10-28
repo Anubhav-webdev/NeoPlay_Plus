@@ -24,6 +24,7 @@ const mediaAssetSchema = new mongoose.Schema(
       type: String,
       enum: [
         "receiving",
+        "queued",
         "checking",
         "processing",
         "ready",
@@ -31,7 +32,7 @@ const mediaAssetSchema = new mongoose.Schema(
         "duplicate",
         "failed",
       ],
-      default: "receiving",
+      default: "queued",
       index: true,
     },
     sha256: { type: String, select: false },

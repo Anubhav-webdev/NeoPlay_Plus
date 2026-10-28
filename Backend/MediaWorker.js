@@ -76,7 +76,7 @@ async function cleanExpiredMedia() {
   }
 
   const orphanedUploads = await MediaAsset.find({
-    status: "receiving",
+    status: { $in: ["receiving", "queued"] },
     createdAt: { $lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
   }).select("+stagedPath +sha256");
   for (const asset of orphanedUploads) {

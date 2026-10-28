@@ -74,7 +74,7 @@ export const createMediaUpload = asyncHandler(async (req, res) => {
         ownerId: req.user._id,
         creatorId,
         mediaType,
-        status: "receiving",
+        status: "queued",
         sha256,
         originalName: safeOriginalName(req.file.originalname),
         detectedMimeType: fileType.mime,
@@ -133,6 +133,7 @@ export const getMediaUploadStatus = asyncHandler(async (req, res) => {
     
   if (!asset) throw new ApiError(404, "Upload not found");
   
+  res.set("Cache-Control", "no-store");
   return sendResponse(res, 200, "Upload status", {
     upload: asset,
     ready: asset.status === "ready",
@@ -209,7 +210,7 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
     throw new ApiError(410, "Staged media expired; ask the creator to upload it again");
   }
   
-  asset.status = "receiving";
+  asset.status = "queued";
   asset.duplicateDecision.reviewedBy = req.user._id;
   asset.duplicateDecision.reviewedAt = new Date();
   await asset.save();
