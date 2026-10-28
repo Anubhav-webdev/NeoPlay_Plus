@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 import FullVideoCard from "./VideoPlayer";
 import SidebarVideoCard from "./VideoSidebarCard";
 import CommentsCard from "../cards/CommentsCard";
@@ -9,9 +10,11 @@ import {
   getPublishedContentById,
   recordPublishedContentView,
 } from "../../api/contentApi";
+import { upsertWatchHistory } from "../../api/watchHistoryApi";
 
 export default function VideoDetail() {
   const { id } = useParams();
+  const user = useSelector((state) => state.auth.user);
   const [, setIsPlaying] = useState(false);
   const [publishedResult, setPublishedResult] = useState(null);
   const [relatedVideos, setRelatedVideos] = useState([]);
@@ -33,6 +36,13 @@ export default function VideoDetail() {
         console.error("Could not record video view", error);
       });
   }, [id]);
+
+  const recordPlaybackProgress = useCallback((progress) => {
+    if (!user || !id || !Number.isFinite(progress)) return;
+    upsertWatchHistory(id, Math.max(0, Math.min(100, progress))).catch((error) => {
+      console.error("Could not save video watch history", error);
+    });
+  }, [id, user]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -128,6 +138,7 @@ export default function VideoDetail() {
               <FullVideoCard
                 video={video}
                 onPlaybackStart={recordViewOnPlayback}
+                onPlaybackProgress={recordPlaybackProgress}
               />
             </div>
 

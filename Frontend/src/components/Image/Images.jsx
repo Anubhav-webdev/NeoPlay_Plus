@@ -25,6 +25,7 @@ export default function ImageGrid() {
         setPublishedImages(items.map((item) => ({
           id: item._id,
           title: item.title,
+          type: "Image",
           channel: item.creatorId?.displayName || "Creator",
           thumb: item.mediaUrl,
           src: item.mediaUrl,

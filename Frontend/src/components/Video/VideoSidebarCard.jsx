@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MdPlaylistAdd } from "react-icons/md"; 
 import { FiMoreVertical } from "react-icons/fi";
+import AddToPlaylistButton from "../Playlist/AddToPlaylistButton";
 
 // Container variant for staggered children animation
 const listContainerVariants = {
@@ -35,9 +35,7 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
     e.preventDefault();
     e.stopPropagation();
     
-    if (actionType === "playlist") {
-      console.log(`Add video ${videoId} to playlist`);
-    } else if (actionType === "menu") {
+    if (actionType === "menu") {
       console.log(`Open context menu for video ${videoId}`);
     }
   };
@@ -122,15 +120,14 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
                   {/* Right Action Buttons with Press Effect */}
                   <div className="flex items-center gap-0.5 shrink-0 mb-0.5">
                     {/* Playlist Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleActionClick(e, "playlist", item.id)}
-                      title="Add to Playlist"
-                      className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    >
-                      <MdPlaylistAdd className="w-5 h-5"/>
-                    </motion.button>
+                    <AddToPlaylistButton
+                      contentId={item.id}
+                      contentType="Video"
+                      showLabel={false}
+                      label="Add to playlist"
+                      iconClassName="w-5 h-5"
+                      className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors duration-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                    />
 
                     {/* 3-Dot Menu Button */}
                     <motion.button

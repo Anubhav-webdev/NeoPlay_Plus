@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   FiSearch,
   FiTrash2,
-  FiPause,
-  FiPlay,
   FiDownload,
   FiClock,
   FiBarChart2,
@@ -11,10 +11,46 @@ import {
   FiBookmark,
   FiFilter,
   FiCalendar,
-  FiExternalLink
+  FiRefreshCw,
 } from "react-icons/fi";
 import VideoCard from "../Video/Videocard";
 import ImageCard from "../Image/ImageCard";
+import {
+  clearMyWatchHistory,
+  deleteWatchHistoryItem,
+  getMyWatchHistory,
+} from "../../api/watchHistoryApi";
+import { addToWishlist, getMyWishlist, removeFromWishlist } from "../../api/wishlistApi";
+
+function toHistoryCard(record) {
+  const content = record.contentId;
+  if (!content?._id) return null;
+  const type = content.type;
+  const durationSeconds = Number(content.mediaAssetId?.metadata?.duration) || 0;
+  const duration = durationSeconds
+    ? `${Math.floor(durationSeconds / 60)}:${String(Math.floor(durationSeconds % 60)).padStart(2, "0")}`
+    : "";
+  const watchedAt = record.watchedAt || record.updatedAt;
+  return {
+    id: String(content._id),
+    contentId: String(content._id),
+    type,
+    title: content.title || "Untitled",
+    category: content.categoryIds?.[0]?.name || "General",
+    thumb: content.thumbnailUrl || content.thumbnailAssetId?.secureUrl || (type === "Image" ? content.mediaUrl : ""),
+    src: content.mediaUrl || "",
+    channel: content.creatorId?.displayName || "Creator",
+    channelAvatar: content.creatorId?.avatar || "",
+    avatar: content.creatorId?.avatar || "",
+    views: content.viewCount || 0,
+    time: watchedAt ? new Date(watchedAt).toLocaleDateString() : "",
+    watchedAt,
+    progress: Number(record.progress) || 0,
+    duration,
+    isBackendContent: true,
+    inWatchHistory: record.inWatchHistory !== false,
+  };
+}
 
 /**
  * WatchHistory Component
@@ -31,13 +67,61 @@ export default function WatchHistory({
   onRemoveItem,
   onClearHistory
 }) {
+  const user = useSelector((state) => state.auth.user);
   const [history, setHistory] = useState(items);
+  const [loadingHistory, setLoadingHistory] = useState(Boolean(user));
+  const [historyError, setHistoryError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("history"); // "history" | "watchLater"
-  const [isHistoryPaused, setIsHistoryPaused] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
-  const [activeVideoModal, setActiveVideoModal] = useState(null);
+
+  useEffect(() => {
+    if (!user) {
+      setHistory([]);
+      setLoadingHistory(false);
+      setHistoryError("");
+      return undefined;
+    }
+    const controller = new AbortController();
+    setLoadingHistory(true);
+    setHistoryError("");
+    Promise.all([
+      getMyWatchHistory({ signal: controller.signal }),
+      getMyWishlist({ signal: controller.signal }).catch((error) => {
+        if (!controller.signal.aborted) setHistoryError(`Watch history loaded, but saved items could not be loaded: ${error.message}`);
+        return [];
+      }),
+    ])
+      .then(([records, wishlistRecords]) => {
+        if (controller.signal.aborted) return;
+        const savedIds = new Set(wishlistRecords
+          .filter((record) => record.contentId?._id)
+          .map((record) => String(record.contentId._id)));
+        const watched = records.map((record) => {
+          const card = toHistoryCard(record);
+          return card ? { ...card, inWatchHistory: true, inWatchLater: savedIds.has(card.contentId) } : null;
+        }).filter(Boolean);
+        const watchedIds = new Set(watched.map((item) => item.contentId));
+        const savedOnly = wishlistRecords.map((record) => toHistoryCard({
+          contentId: record.contentId,
+          watchedAt: record.createdAt,
+          progress: 0,
+          inWatchHistory: false,
+        })).filter((card) => card && !watchedIds.has(card.contentId))
+          .map((card) => ({ ...card, inWatchHistory: false, inWatchLater: true }));
+        setHistory([...watched, ...savedOnly]);
+        setSelectedIds([]);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setHistoryError(error.message || "Could not load your watch history.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingHistory(false);
+      });
+    return () => controller.abort();
+  }, [user, reloadKey]);
 
   // Extract unique categories from history items
   const categories = useMemo(() => {
@@ -46,25 +130,58 @@ export default function WatchHistory({
   }, [history]);
 
   // Actions
-  const deleteItem = (id) => {
-    setHistory((prev) => prev.filter((item) => item.id !== id));
-    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
-    if (onRemoveItem) onRemoveItem(id);
+  const deleteItem = async (id) => {
+    const item = history.find((entry) => entry.id === id);
+    setHistoryError("");
+    try {
+      if (activeTab === "watchLater" && item?.inWatchLater) {
+        await removeFromWishlist(item.contentId);
+        setHistory((prev) => prev.map((entry) => (
+          entry.id === id ? { ...entry, inWatchLater: false } : entry
+        )).filter((entry) => entry.inWatchLater || entry.inWatchHistory));
+        setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+        return;
+      }
+      if (item?.isBackendContent && user) await deleteWatchHistoryItem(item.contentId);
+      setHistory((prev) => item?.inWatchLater
+        ? prev.map((entry) => entry.id === id ? { ...entry, inWatchHistory: false } : entry)
+        : prev.filter((entry) => entry.id !== id));
+      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+      onRemoveItem?.(id);
+    } catch (error) {
+      setHistoryError(error.message || "Could not remove this history item.");
+    }
   };
 
-  const toggleWatchLater = (id) => {
-    setHistory((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, inWatchLater: !item.inWatchLater } : item
-      )
-    );
+  const toggleWatchLater = async (id) => {
+    const item = history.find((entry) => entry.id === id);
+    if (!item || !user) return;
+    const nextValue = !item.inWatchLater;
+    setHistoryError("");
+    try {
+      if (nextValue) await addToWishlist(item.contentId);
+      else await removeFromWishlist(item.contentId);
+      setHistory((prev) => prev.map((entry) => (
+        entry.id === id ? { ...entry, inWatchLater: nextValue } : entry
+      )).filter((entry) => entry.inWatchLater || entry.inWatchHistory));
+    } catch (error) {
+      setHistoryError(error.message || "Could not update your Watch later list.");
+    }
   };
 
-  const clearAllHistory = () => {
+  const clearAllHistory = async () => {
     if (confirm("Are you sure you want to permanently wipe your entire history?")) {
-      setHistory([]);
-      setSelectedIds([]);
-      if (onClearHistory) onClearHistory();
+      setHistoryError("");
+      try {
+        if (user) await clearMyWatchHistory();
+        setHistory((current) => current
+          .map((item) => ({ ...item, inWatchHistory: false }))
+          .filter((item) => item.inWatchLater));
+        setSelectedIds([]);
+        onClearHistory?.();
+      } catch (error) {
+        setHistoryError(error.message || "Could not clear watch history.");
+      }
     }
   };
 
@@ -74,10 +191,25 @@ export default function WatchHistory({
     );
   };
 
-  const deleteSelected = () => {
+  const deleteSelected = async () => {
     if (confirm(`Delete ${selectedIds.length} selected items?`)) {
-      setHistory((prev) => prev.filter((item) => !selectedIds.includes(item.id)));
+      const selected = history.filter((item) => selectedIds.includes(item.id));
+      const results = await Promise.allSettled(selected.map((item) => {
+        if (!item.isBackendContent || !user) return Promise.resolve();
+        return activeTab === "watchLater"
+          ? removeFromWishlist(item.contentId)
+          : deleteWatchHistoryItem(item.contentId);
+      }));
+      const removed = new Set(selected.filter((_, index) => results[index].status === "fulfilled").map((item) => item.id));
+      setHistory((prev) => activeTab === "watchLater"
+        ? prev.map((item) => removed.has(item.id) ? { ...item, inWatchLater: false } : item)
+          .filter((item) => item.inWatchLater || item.inWatchHistory)
+        : prev.map((item) => removed.has(item.id) ? { ...item, inWatchHistory: false } : item)
+          .filter((item) => item.inWatchLater || item.inWatchHistory));
       setSelectedIds([]);
+      setHistoryError(results.some((result) => result.status === "rejected")
+        ? "Some selected items could not be removed. Refresh to see the latest list."
+        : "");
     }
   };
 
@@ -109,6 +241,7 @@ export default function WatchHistory({
   // Group videos dynamically by date section & filter
   const groupedHistory = useMemo(() => {
     const filtered = history.filter((video) => {
+      if (activeTab === "history" && !video.inWatchHistory) return false;
       if (activeTab === "watchLater" && !video.inWatchLater) return false;
 
       const matchesSearch =
@@ -149,7 +282,8 @@ export default function WatchHistory({
     const totalMinutes = history.reduce((acc, curr) => {
       const parts = (curr.duration || "0:0").split(":");
       const mins = parseInt(parts[0], 10) || 0;
-      return acc + mins * ((curr.progress || 100) / 100);
+      const secs = parseInt(parts[1], 10) || 0;
+      return acc + (mins + secs / 60) * ((curr.progress ?? 0) / 100);
     }, 0);
 
     const catCounts = history.reduce((acc, curr) => {
@@ -163,7 +297,7 @@ export default function WatchHistory({
 
     return {
       watchTimeHours: (totalMinutes / 60).toFixed(1),
-      totalVideos: history.length,
+      totalItems: history.filter((item) => item.inWatchHistory).length,
       watchLaterCount,
       topCategory
     };
@@ -195,7 +329,7 @@ export default function WatchHistory({
                 }`}
               >
                 <FiClock className="text-sm" />
-                History <span className="text-white/50">{history.length}</span>
+                History <span className="text-white/50">{history.filter((item) => item.inWatchHistory).length}</span>
               </button>
               <button
                 onClick={() => setActiveTab("watchLater")}
@@ -261,7 +395,7 @@ export default function WatchHistory({
             {selectedIds.length > 0 && (
               <div className="bg-indigo-950/40 border border-indigo-500/30 p-3 rounded-xl flex items-center justify-between">
                 <span className="text-xs font-semibold text-indigo-200">
-                  {selectedIds.length} video(s) selected
+                  {selectedIds.length} item(s) selected
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -281,12 +415,23 @@ export default function WatchHistory({
             )}
 
             {/* Date Grouped Video List */}
-            {totalFilteredCount === 0 ? (
+            {historyError && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{historyError}</p>}
+            {loadingHistory ? (
+              <div role="status" className="flex items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#111116]/50 py-16 text-sm text-slate-300">
+                <FiRefreshCw className="animate-spin" /> Loading your watch history…
+              </div>
+            ) : !user ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-[#111116]/50 py-16 text-center">
+                <FiClock className="mx-auto mb-3 text-4xl text-slate-600" />
+                <h3 className="text-sm font-bold text-white">Sign in to see your watch history</h3>
+                <Link to="/signup" className="mt-4 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500">Sign in</Link>
+              </div>
+            ) : totalFilteredCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 bg-[#111116]/50 rounded-2xl">
                 <FiClock className="text-4xl text-slate-600 mb-3" />
-                <h3 className="text-sm font-bold text-white">No records found</h3>
+                <h3 className="text-sm font-bold text-white">{history.some((item) => item.inWatchHistory) ? "No matching records" : "No watch history yet"}</h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs text-center">
-                  Try adjusting your search query or category filters.
+                  {history.some((item) => item.inWatchHistory) ? "Try adjusting your search query or category filters." : "Published videos and images you open will appear here."}
                 </p>
               </div>
             ) : (
@@ -305,15 +450,39 @@ export default function WatchHistory({
                     {/* Reused VideoCard Grid */}
                     <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                       {videos.map((video) => (
-                        <div key={video.id} className="relative group">
-                          <VideoCard
-                            video={video}
-                            isSelected={selectedIds.includes(video.id)}
-                            onSelect={() => toggleSelect(video.id)}
-                            onDelete={() => deleteItem(video.id)}
-                            onToggleWatchLater={() => toggleWatchLater(video.id)}
-                            onClick={() => setActiveVideoModal(video)}
-                          />
+                        <div key={video.id} className="group relative">
+                          {video.type === "Image" ? (
+                            <ImageCard image={{ ...video, isBackendContent: true }} />
+                          ) : (
+                            <VideoCard video={video} />
+                          )}
+                          <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 rounded-lg border border-white/10 bg-black/70 px-2.5 py-1.5 text-xs text-white shadow-lg backdrop-blur">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${video.title}`}
+                              checked={selectedIds.includes(video.id)}
+                              onChange={() => toggleSelect(video.id)}
+                              className="accent-indigo-500"
+                            />
+                            <span className="max-w-24 truncate">{video.progress}% watched</span>
+                            <button
+                              type="button"
+                              aria-label={video.inWatchLater ? `Remove ${video.title} from Watch later` : `Save ${video.title} to Watch later`}
+                              title={video.inWatchLater ? "Remove from Watch later" : "Save to Watch later"}
+                              onClick={() => toggleWatchLater(video.id)}
+                              className={video.inWatchLater ? "text-amber-300" : "text-slate-300 hover:text-amber-300"}
+                            >
+                              <FiBookmark />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            aria-label={activeTab === "watchLater" ? `Remove ${video.title} from Watch later` : `Remove ${video.title} from watch history`}
+                            onClick={() => deleteItem(video.id)}
+                            className="absolute bottom-3 right-3 z-20 rounded-lg border border-white/10 bg-black/70 p-2 text-white shadow-lg backdrop-blur transition hover:bg-rose-700"
+                          >
+                            <FiTrash2 />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -334,22 +503,15 @@ export default function WatchHistory({
 
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => setIsHistoryPaused(!isHistoryPaused)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-bold transition-all border ${
-                    isHistoryPaused
-                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                      : "bg-white/[0.02] border-white/10 text-slate-300 hover:bg-white/[0.06]"
-                  }`}
+                  onClick={() => setReloadKey((value) => value + 1)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold text-slate-300 bg-white/[0.02] border border-white/10 hover:bg-white/[0.06] transition-all"
                 >
-                  <span className="flex items-center gap-2">
-                    {isHistoryPaused ? <FiPlay className="text-sm" /> : <FiPause className="text-sm" />}
-                    {isHistoryPaused ? "RESUME FEED LOGGING" : "PAUSE WATCH TIMELINE"}
-                  </span>
+                  <FiRefreshCw /> REFRESH HISTORY
                 </button>
 
                 <button
                   onClick={clearAllHistory}
-                  disabled={history.length === 0}
+                  disabled={!history.some((item) => item.inWatchHistory)}
                   className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold text-slate-400 hover:text-rose-400 bg-white/[0.02] border border-white/10 hover:bg-rose-950/20 hover:border-rose-500/30 transition-all disabled:opacity-30"
                 >
                   <FiTrash2 className="text-sm" /> WIPE ALL RECORDS
@@ -440,50 +602,6 @@ export default function WatchHistory({
         </section>
       </div>
 
-      {/* Video Modal */}
-      {activeVideoModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#111116] border border-white/20 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl relative">
-            <button
-              onClick={() => setActiveVideoModal(null)}
-              className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black transition-colors"
-            >
-              <FiX className="text-lg" />
-            </button>
-
-            <div className="aspect-video bg-black relative">
-              <img
-                src={activeVideoModal.thumbnail}
-                alt={activeVideoModal.title}
-                className="w-full h-full object-cover opacity-60"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <a
-                  href={`https://youtube.com/watch?v=${activeVideoModal.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-full font-bold text-sm shadow-xl transition-all scale-105"
-                >
-                  <FiExternalLink /> Watch on YouTube
-                </a>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <span className="text-xs font-mono font-bold text-indigo-400 uppercase bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
-                {activeVideoModal.category}
-              </span>
-              <h2 className="text-lg font-bold text-white mt-2">{activeVideoModal.title}</h2>
-              <div className="flex items-center gap-2 mt-2">
-                {activeVideoModal.channelAvatar && (
-                  <img src={activeVideoModal.channelAvatar} alt={activeVideoModal.channel} className="w-5 h-5 rounded-full" />
-                )}
-                <p className="text-xs text-slate-400">{activeVideoModal.channel} • {activeVideoModal.views}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

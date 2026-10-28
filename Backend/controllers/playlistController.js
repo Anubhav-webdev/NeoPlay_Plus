@@ -129,6 +129,9 @@ export const addPlaylistItem = asyncHandler(async (req, res) => {
   ]);
   if (!playlist) throw new ApiError(404, "Playlist not found");
   if (!content) throw new ApiError(404, "Published content not found");
+  if (!new Set(["Video", "Image"]).has(content.type)) {
+    throw new ApiError(400, "Only videos and images can be added to playlists");
+  }
   if (!playlist.contentIds.some((id) => String(id) === String(content._id))) {
     playlist.contentIds.push(content._id);
     await playlist.save();

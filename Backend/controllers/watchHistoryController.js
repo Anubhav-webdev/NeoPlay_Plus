@@ -4,6 +4,21 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import cloudinary from "../config/cloudinary.js";
+
+function serializeHistoryItem(item) {
+  const content = item.contentId?.toObject ? item.contentId.toObject() : item.contentId;
+  if (!content) return item;
+  const thumbnailUrl = content.thumbnailUrl || content.thumbnailAssetId?.secureUrl ||
+    (content.type === "Video" && content.mediaPublicId
+      ? cloudinary.url(content.mediaPublicId, {
+          resource_type: "video",
+          format: "jpg",
+          transformation: [{ start_offset: "0" }],
+        })
+      : null);
+  return { ...item.toObject(), contentId: { ...content, thumbnailUrl } };
+}
 
 export const listWatchHistory = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
@@ -19,12 +34,18 @@ export const listWatchHistory = asyncHandler(async (req, res) => {
       .populate({
         path: "contentId",
         match: { status: "published" },
-        populate: { path: "creatorId", select: "displayName avatar" },
+        select: "title type description thumbnailUrl thumbnailAssetId mediaUrl mediaPublicId publishedAt viewCount creatorId categoryIds mediaAssetId",
+        populate: [
+          { path: "creatorId", select: "displayName avatar" },
+          { path: "categoryIds", select: "name slug" },
+          { path: "thumbnailAssetId", select: "secureUrl" },
+          { path: "mediaAssetId", select: "mediaType metadata" },
+        ],
       }),
     WatchHistory.countDocuments({ userId: req.user._id }),
   ]);
   return sendResponse(res, 200, "Watch history retrieved", {
-    items: items.filter((item) => item.contentId),
+    items: items.filter((item) => item.contentId).map(serializeHistoryItem),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 });

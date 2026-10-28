@@ -4,6 +4,21 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import cloudinary from "../config/cloudinary.js";
+
+function serializeWishlistItem(item) {
+  const content = item.contentId?.toObject ? item.contentId.toObject() : item.contentId;
+  if (!content) return item;
+  const thumbnailUrl = content.thumbnailUrl || content.thumbnailAssetId?.secureUrl ||
+    (content.type === "Video" && content.mediaPublicId
+      ? cloudinary.url(content.mediaPublicId, {
+          resource_type: "video",
+          format: "jpg",
+          transformation: [{ start_offset: "0" }],
+        })
+      : null);
+  return { ...item.toObject(), contentId: { ...content, thumbnailUrl } };
+}
 
 export const listWishlist = asyncHandler(async (req, res) => {
   const savedItems = await Wishlist.find({ userId: req.user._id })
@@ -11,10 +26,16 @@ export const listWishlist = asyncHandler(async (req, res) => {
     .populate({
       path: "contentId",
       match: { status: "published" },
-      select: "title type thumbnailUrl mediaUrl publishedAt",
+      select: "title type thumbnailUrl thumbnailAssetId mediaUrl mediaPublicId publishedAt description creatorId categoryIds mediaAssetId",
+      populate: [
+        { path: "thumbnailAssetId", select: "secureUrl" },
+        { path: "creatorId", select: "displayName avatar" },
+        { path: "categoryIds", select: "name slug" },
+        { path: "mediaAssetId", select: "mediaType metadata" },
+      ],
     });
   return sendResponse(res, 200, "Wishlist retrieved", {
-    items: savedItems.filter((item) => item.contentId),
+    items: savedItems.filter((item) => item.contentId).map(serializeWishlistItem),
   });
 });
 

@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { FiCheck, FiHeart, FiX } from "react-icons/fi";
 import { getContentLikeStatus, setContentLiked } from "../../api/likesApi";
+import { upsertWatchHistory } from "../../api/watchHistoryApi";
+import AddToPlaylistButton from "../Playlist/AddToPlaylistButton";
 
 export default function ImageCard({
   image,
@@ -17,6 +19,7 @@ export default function ImageCard({
   const [savingLike, setSavingLike] = useState(false);
   const [likeError, setLikeError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const imageSource = image.thumb || image.src || image.url;
   const liked = image.isBackendContent ? localLiked : controlledLiked ?? localLiked;
 
@@ -71,6 +74,11 @@ export default function ImageCard({
 
   const openFullscreen = () => {
     setIsFullscreen(true);
+    if (image.isBackendContent && image.id && user) {
+      upsertWatchHistory(image.id, 100).catch((error) => {
+        setHistoryError(error.message || "Could not save this image to watch history.");
+      });
+    }
   };
 
   return (
@@ -110,6 +118,15 @@ export default function ImageCard({
           </div>
 
           {/* Floating Like Button */}
+          {image.isBackendContent && (
+            <AddToPlaylistButton
+              contentId={image.id}
+              contentType="Image"
+              showLabel={false}
+              label="Add image to playlist"
+              className="absolute top-3 left-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/50 text-white opacity-100 shadow-md backdrop-blur-md transition hover:bg-black/75 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+            />
+          )}
           <button
             onClick={handleLike}
             disabled={savingLike}
@@ -130,6 +147,7 @@ export default function ImageCard({
       </div>
 
       {likeError && <p role="alert" className="mt-1 text-xs text-red-300">{likeError}</p>}
+      {historyError && <p role="status" className="mt-1 text-xs text-amber-200">{historyError}</p>}
 
       {/* --- Fullscreen Modal --- */}
       {isFullscreen && createPortal(
@@ -157,9 +175,19 @@ export default function ImageCard({
   />
 
   {/*icon */}
-  <div className="absolute top-5 right-2  text-white/50  text-xl font-semibold flex gap-1  sidebar-font">
+          <div className="absolute top-5 right-2 text-white/50 text-xl font-semibold flex gap-1 sidebar-font">
     NeoOriginals+
   </div>
+
+  {image.isBackendContent && (
+    <AddToPlaylistButton
+      contentId={image.id}
+      contentType="Image"
+      showLabel={false}
+      label="Add image to playlist"
+      className="absolute left-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white shadow-lg backdrop-blur-md hover:bg-black/80"
+    />
+  )}
 
   {/* Image Info */}
           <div className="absolute bottom-0 inset-x-0 p-4 bg-linear-to-t from-black/80 to-transparent flex items-center justify-between">

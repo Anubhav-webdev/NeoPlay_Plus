@@ -10,9 +10,9 @@ import {
   FiMoreVertical, 
   FiCheckCircle 
 } from "react-icons/fi";
-import { MdPlaylistAdd } from "react-icons/md"; 
 import { FaShareSquare } from "react-icons/fa";
 import { getContentLikeStatus, setContentLiked } from "../../api/likesApi";
+import AddToPlaylistButton from "../Playlist/AddToPlaylistButton";
 
 const confettiColors = ["#ff3b30", "#ffd60a", "#34c759", "#0a84ff", "#ff2d55", "#bf5af2", "#64d2ff"];
 const confettiPieces = Array.from({ length: 48 }, (_, index) => ({
@@ -211,12 +211,12 @@ export default function VideoHeaderInfo({ video }) {
           </button>
 
           {/* Playlist Button */}
-          <button
-          title="Add to playlist"
-          className="flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-colors shrink-0">
-            <MdPlaylistAdd className="h-4 w-4" />
-            <span>Add Playlist</span>
-          </button>
+          <AddToPlaylistButton
+            contentId={video?.id}
+            contentType="Video"
+            label="Add to playlist"
+            className="flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-colors shrink-0"
+          />
 
           {/* Context Menu Button */}
           <button className="rounded-full bg-white/5 border border-white/10 p-2 text-white/70 hover:bg-white/10 hover:text-white transition-colors shrink-0">

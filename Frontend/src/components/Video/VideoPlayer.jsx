@@ -12,7 +12,7 @@ import {
 
 const DEMO_PLAYLIST = [BunnyVideo, AnotherVideo];
 
-export default function VideoDetail({ video, onPlaybackStart }) {
+export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress }) {
   const resolvedVideo = video || VIDEOS[0];
   
   // ── Player Core States ───────────────────────────────────────────
@@ -45,9 +45,14 @@ export default function VideoDetail({ video, onPlaybackStart }) {
   const speedMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const canvasRef = useRef(null);
+  const lastProgressSaveRef = useRef(0);
 
   const totalTracksCount = resolvedVideo?.src ? VIDEOS.length : DEMO_PLAYLIST.length;
   const videoSrc = resolvedVideo?.src ?? DEMO_PLAYLIST[videoIndex];
+
+  useEffect(() => {
+    lastProgressSaveRef.current = 0;
+  }, [resolvedVideo?.id]);
 
   // ── Auto-hide Controls Logic ─────────────────────────────────────
   const hideControlsTimeout = useCallback(() => {
@@ -306,13 +311,39 @@ export default function VideoDetail({ video, onPlaybackStart }) {
           onClick={handleTogglePlay}
           onDoubleClick={handleToggleFullscreen}
           onLoadedMetadata={(e) => setDuration(e.target.duration)}
-          onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
+          onTimeUpdate={(e) => {
+            const { currentTime: playedSeconds, duration: totalSeconds } = e.currentTarget;
+            setCurrentTime(playedSeconds);
+            if (
+              Number.isFinite(totalSeconds) && totalSeconds > 0 &&
+              (playedSeconds - lastProgressSaveRef.current >= 15 ||
+                (totalSeconds - playedSeconds <= 2 && totalSeconds - lastProgressSaveRef.current > 2))
+            ) {
+              lastProgressSaveRef.current = playedSeconds;
+              onPlaybackProgress?.(Math.min(100, Math.round((playedSeconds / totalSeconds) * 100)));
+            }
+          }}
           onPlay={() => {
             setIsPlaying(true);
             onPlaybackStart?.();
+            const player = videoRef.current;
+            if (player && player.duration > 0) {
+              lastProgressSaveRef.current = player.currentTime;
+              onPlaybackProgress?.(Math.min(100, Math.round((player.currentTime / player.duration) * 100)));
+            }
           }}
-          onPause={() => setIsPlaying(false)}
-          onEnded={() => { if (!isLooping) { setIsPlaying(false); playNext(); } }}
+          onPause={(e) => {
+            setIsPlaying(false);
+            const player = e.currentTarget;
+            if (player.duration > 0) {
+              lastProgressSaveRef.current = player.currentTime;
+              onPlaybackProgress?.(Math.min(100, Math.round((player.currentTime / player.duration) * 100)));
+            }
+          }}
+          onEnded={(e) => {
+            onPlaybackProgress?.(100);
+            if (!isLooping) { setIsPlaying(false); playNext(); }
+          }}
           onWaiting={() => setIsBuffering(true)}
           onCanPlay={() => setIsBuffering(false)}
           onPlaying={() => setIsBuffering(false)}
