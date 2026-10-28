@@ -27,9 +27,9 @@ separate worker must be running for uploads to move beyond the queued state.
 
    If the API and worker run on separate machines, they must share the same
    `MEDIA_TEMP_DIR` path and contents because queued jobs refer to staged files.
-5. Set `VITE_API_BASE_URL` in the frontend environment to the API URL ending in
-   `/api` (for example, `http://localhost:5000/api`), then run the frontend
-   development server.
+5. From Frontend, copy `.env.example` to `.env` and set `VITE_API_BASE_URL` to the
+   API URL ending in `/api` (the example uses `http://localhost:5000/api`),
+   then run the frontend development server.
 
    If an earlier deployment created the `expiresAt_1` TTL index on the
    `mediaassets` collection, remove it with `db.mediaassets.dropIndex("expiresAt_1")`.
@@ -76,3 +76,9 @@ After it succeeds, sign out and sign in again, then open
 
 Run the media unit tests with `npm test` from `Backend`. Tests that require a
 working bundled FFmpeg encoder are skipped when that binary is unavailable.
+
+The upload API only queues files. If an upload remains queued or checking, make
+sure the Backend worker process is running and can connect to the same MongoDB,
+Redis, and staging directory as the API. Supported video files are MP4, M4V,
+MOV, WebM, and MKV. The default size limit is 100 MB and the default duration
+limit is one hour; both can be changed in the .env file.

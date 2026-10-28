@@ -12,7 +12,7 @@ import {
 
 const DEMO_PLAYLIST = [BunnyVideo, AnotherVideo];
 
-export default function VideoDetail({ video }) {
+export default function VideoDetail({ video, onPlaybackStart }) {
   const resolvedVideo = video || VIDEOS[0];
   
   // ── Player Core States ───────────────────────────────────────────
@@ -47,6 +47,7 @@ export default function VideoDetail({ video }) {
   const canvasRef = useRef(null);
 
   const totalTracksCount = resolvedVideo?.src ? VIDEOS.length : DEMO_PLAYLIST.length;
+  const videoSrc = resolvedVideo?.src ?? DEMO_PLAYLIST[videoIndex];
 
   // ── Auto-hide Controls Logic ─────────────────────────────────────
   const hideControlsTimeout = useCallback(() => {
@@ -121,13 +122,13 @@ export default function VideoDetail({ video }) {
     const videoEl = videoRef.current;
     if (!videoEl) return;
     
-    videoEl.src = resolvedVideo?.src ?? DEMO_PLAYLIST[videoIndex];
+    videoEl.src = videoSrc;
     videoEl.load();
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
     setBookmarks([]);
-  }, [resolvedVideo, videoIndex]);
+  }, [videoSrc]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -298,7 +299,7 @@ export default function VideoDetail({ video }) {
         {/* Clean Media Hooks Sync State directly from native player components */}
         <video
           ref={videoRef}
-          src={resolvedVideo?.src ?? DEMO_PLAYLIST[videoIndex]}
+          src={videoSrc}
           poster={resolvedVideo?.thumb}
           crossOrigin="anonymous"
           className="w-full h-full object-contain bg-black"
@@ -306,7 +307,10 @@ export default function VideoDetail({ video }) {
           onDoubleClick={handleToggleFullscreen}
           onLoadedMetadata={(e) => setDuration(e.target.duration)}
           onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
-          onPlay={() => setIsPlaying(true)}
+          onPlay={() => {
+            setIsPlaying(true);
+            onPlaybackStart?.();
+          }}
           onPause={() => setIsPlaying(false)}
           onEnded={() => { if (!isLooping) { setIsPlaying(false); playNext(); } }}
           onWaiting={() => setIsBuffering(true)}

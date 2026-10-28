@@ -1,6 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Video, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud } from 'lucide-react';
 import { FiTwitter } from 'react-icons/fi';
+import {
+  IMAGE_UPLOAD_ACCEPT,
+  VIDEO_UPLOAD_ACCEPT,
+} from "../../../constants/mediaTypes.js";
 
 export default function ContentCatalogStream({
   catalogTab, setCatalogTab, searchQuery, setSearchQuery, filteredCatalog,
@@ -89,7 +93,11 @@ export default function ContentCatalogStream({
                           <input
                             ref={editFileInputRef}
                             type="file"
-                            accept={editFormState.type === 'video' ? 'video/*' : 'image/*'}
+                            accept={
+                              editFormState.type === "video"
+                                ? VIDEO_UPLOAD_ACCEPT
+                                : IMAGE_UPLOAD_ACCEPT
+                            }
                             onChange={handleEditMediaFileChange}
                             disabled={isSavingEdit}
                             className="hidden"

@@ -78,13 +78,17 @@ export const getContent = asyncHandler(async (req, res) => {
   const content = await Content.findById(req.params.contentId)
     .populate("creatorId", "displayName avatar")
     .populate("categoryIds", "name slug");
-  if (
-    !content ||
-    (content.status !== "published" &&
-      req.user?.role !== "admin" &&
-      String(content.creatorId?._id) !== String(req.user?._id))
-  ) {
-    throw new ApiError(404, "Content not found");
+  if (!content) throw new ApiError(404, "Content not found");
+
+  if (content.status !== "published" && req.user?.role !== "admin") {
+    const ownedCreator =
+      req.user?._id &&
+      content.creatorId?._id &&
+      (await Creator.exists({
+        _id: content.creatorId?._id,
+        userId: req.user._id,
+      }));
+    if (!ownedCreator) throw new ApiError(404, "Content not found");
   }
   return sendResponse(res, 200, "Content retrieved", { content });
 });

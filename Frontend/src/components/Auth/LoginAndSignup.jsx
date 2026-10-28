@@ -79,7 +79,9 @@ const LoginAndSignup = () => {
     if (!signupData.email.trim()) err.email = "Email is required";
     else if (!/^\S+@\S+\.\S+$/.test(signupData.email)) err.email = "Invalid email address";
     if (!signupData.phone.trim()) err.phone = "Phone number is required";
-    else if (!/^[0-9]{10}$/.test(signupData.phone)) err.phone = "Phone must be 10 digits";
+    else if (!/^\+?[0-9]{7,15}$/.test(signupData.phone)) {
+      err.phone = "Enter 7 to 15 digits, optionally starting with +";
+    }
     if (!signupData.password.trim()) err.password = "Password is required";
     else if (signupData.password.length < 8) err.password = "Must be at least 8 characters";
     if (!signupData.confirmPassword.trim()) err.confirmPassword = "Confirm your password";

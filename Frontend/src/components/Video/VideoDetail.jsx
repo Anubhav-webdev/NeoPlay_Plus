@@ -1,16 +1,38 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import FullVideoCard from "./VideoPlayer";
 import SidebarVideoCard from "./VideoSidebarCard";
 import CommentsCard from "../cards/CommentsCard";
 import VideoHeaderInfo from "./VideoHeaderInfo";
-import { getPublishedContent, getPublishedContentById } from "../../api/contentApi";
+import {
+  getPublishedContent,
+  getPublishedContentById,
+  recordPublishedContentView,
+} from "../../api/contentApi";
 
 export default function VideoDetail() {
   const { id } = useParams();
   const [, setIsPlaying] = useState(false);
   const [publishedResult, setPublishedResult] = useState(null);
   const [relatedVideos, setRelatedVideos] = useState([]);
+  const recordedViewId = useRef(null);
+
+  const recordViewOnPlayback = useCallback(() => {
+    if (!id || recordedViewId.current === id) return;
+    recordedViewId.current = id;
+    recordPublishedContentView(id)
+      .then((viewCount) => {
+        setPublishedResult((current) =>
+          current?.id === id && current.video
+            ? { ...current, video: { ...current.video, views: viewCount } }
+            : current,
+        );
+      })
+      .catch((error) => {
+        if (recordedViewId.current === id) recordedViewId.current = null;
+        console.error("Could not record video view", error);
+      });
+  }, [id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -103,7 +125,10 @@ export default function VideoDetail() {
             
             {/* LIVE CONSOLE PLAYER CANVAS CONTAINER */}
             <div className="w-full overflow-hidden rounded-xl shadow-xl h-full">
-              <FullVideoCard video={video} />
+              <FullVideoCard
+                video={video}
+                onPlaybackStart={recordViewOnPlayback}
+              />
             </div>
 
             {/* VIDEO METADATA INFO PANEL */}

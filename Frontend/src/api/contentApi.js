@@ -27,6 +27,15 @@ export async function getPublishedContentById(contentId, { signal } = {}) {
   return result.data.content;
 }
 
+export async function recordPublishedContentView(contentId) {
+  const response = await fetch(
+    API_BASE_URL + "/content/" + encodeURIComponent(contentId) + "/view",
+    { method: "POST" },
+  );
+  const result = await readApiResponse(response);
+  return result.data.viewCount;
+}
+
 export async function getPublishedCreators({ signal } = {}) {
   const response = await fetch(`${API_BASE_URL}/creators?limit=50`, { signal });
   const result = await readApiResponse(response);

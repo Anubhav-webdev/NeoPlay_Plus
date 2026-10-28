@@ -1,1 +1,1 @@
-export const DB_NAME='Neoplay+'
+export const DB_NAME = process.env.DB_NAME || "Neoplay+";

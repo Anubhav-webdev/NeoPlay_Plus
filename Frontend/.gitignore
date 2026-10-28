@@ -5,6 +5,7 @@ build/
 .vite/
 .env
 .env.*
+!.env.example
 .env.local
 .env.*.local
 npm-debug.log*

@@ -2,6 +2,11 @@
 import { motion } from "framer-motion";
 import { UploadCloud, Video, Image as ImageIcon } from "lucide-react";
 import { FiTwitter } from "react-icons/fi";
+import {
+  IMAGE_UPLOAD_ACCEPT,
+  MEDIA_UPLOAD_ACCEPT,
+  VIDEO_UPLOAD_ACCEPT,
+} from "../../../constants/mediaTypes.js";
 
 export default function UploadContentForm({
   contentType,
@@ -34,10 +39,10 @@ export default function UploadContentForm({
 
   const acceptedFiles =
     contentType === "video"
-      ? "video/*"
+      ? VIDEO_UPLOAD_ACCEPT
       : contentType === "image"
-        ? "image/*"
-        : "image/*,video/*";
+        ? IMAGE_UPLOAD_ACCEPT
+        : MEDIA_UPLOAD_ACCEPT;
 
   const selectedFile = uploadedFilesArray[0];
 

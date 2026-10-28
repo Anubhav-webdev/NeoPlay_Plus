@@ -1,6 +1,7 @@
 node_modules/
 .env
 .env.*
+!.env.example
 logs/
 *.log
 npm-debug.log*
@@ -10,6 +11,7 @@ pnpm-debug.log*
 coverage/
 dist/
 uploads/
+tmp/
 .DS_Store
 
 # Editor / IDE
