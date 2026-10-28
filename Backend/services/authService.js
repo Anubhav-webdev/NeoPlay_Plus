@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { createHash } from "node:crypto";
-import ApiError from "../scripts/utils/ApiError.js"
+import ApiError from  "../utils/ApiError.js"
 
 const ACCESS_TTL = process.env.ACCESS_TOKEN_TTL || "15m";
 const REFRESH_TTL = process.env.REFRESH_TOKEN_TTL || "7d";

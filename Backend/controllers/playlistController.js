@@ -1,9 +1,9 @@
 import Playlist from "../models/Playlist.js";
 import Content from "../models/Content.js";
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
-import validateObjectId from "../scripts/utils/validateObjectId.js";
+import ApiError from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
+import validateObjectId from "../utils/validateObjectId.js";
 
 export const listPlaylists = asyncHandler(async (req, res) => {
   const playlists = await Playlist.find({ userId: req.user._id })

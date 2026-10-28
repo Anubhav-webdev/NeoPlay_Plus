@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/index.js";
 import notFound from "./middlewares/notFound.js";
 import errorHandler from "./middlewares/errorHandler.js";
-import ApiError from "./scripts/utils/ApiError.js"
+import ApiError from  "./utils/ApiError.js"
 
 const app = express();
 const configuredOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")

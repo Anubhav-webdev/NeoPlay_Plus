@@ -3,10 +3,10 @@ import Creator from "../models/Creator.js";
 import Content from "../models/Content.js";
 import Report from "../models/Report.js";
 import { setCreatorDecision } from "./creatorController.js";
-import ApiError from "../scripts/utils/ApiError.js"
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
-import validateObjectId from "../scripts/utils/validateObjectId.js";
+import ApiError from "../utils/ApiError.js"
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
+import validateObjectId from "../utils/validateObjectId.js";
 
 // Dashboard totals support the admin overview page.
 export const getOverview = asyncHandler(async (req, res) => {

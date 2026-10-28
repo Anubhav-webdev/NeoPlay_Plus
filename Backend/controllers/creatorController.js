@@ -5,12 +5,6 @@ import { fileTypeFromFile } from "file-type";
 import sharp from "sharp";
 import Creator from "../models/Creator.js";
 import User from "../models/users.js";
-<<<<<<< HEAD
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
-import validateObjectId from "../scripts/utils/validateObjectId.js";
-=======
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
@@ -24,7 +18,6 @@ const PROFILE_IMAGE_TYPES = {
 };
 const PROFILE_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const PROFILE_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
->>>>>>> 745911a3b74bbdb7d5aa188e1a24a4c1a5f8a804
 
 // Creator directory contains approved profiles only.
 export const listCreators = asyncHandler(async (req, res) => {

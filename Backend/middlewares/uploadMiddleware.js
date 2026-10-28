@@ -2,7 +2,7 @@ import multer from "multer";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import ApiError from "../scripts/utils/ApiError.js";
+import ApiError from "../utils/ApiError.js";
 import { mediaConfig } from "../config/media.js";
 
 const storage = multer.diskStorage({

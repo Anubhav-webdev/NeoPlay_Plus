@@ -1,7 +1,7 @@
 import User from "../models/users.js";
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
+import ApiError from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
 
 // User endpoints expose only profile fields, never password or token hashes.
 export const getProfile = asyncHandler(async (req, res) =>

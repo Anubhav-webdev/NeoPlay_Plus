@@ -1,10 +1,10 @@
 import Subscription from "../models/Subscription.js";
 import Creator from "../models/Creator.js";
 import Notification from "../models/Notification.js";
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
-import validateObjectId from "../scripts/utils/validateObjectId.js";
+import ApiError from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
+import validateObjectId from "../utils/validateObjectId.js";
 
 export const listSubscriptions = asyncHandler(async (req, res) => {
   const subscriptions = await Subscription.find({ subscriberId: req.user._id })

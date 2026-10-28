@@ -1,6 +1,6 @@
 import User from "../models/users.js";
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
 import { verifyAccessToken } from "../services/authService.js";
 
 // Verify the bearer access token and load the current role from the database.

@@ -1,8 +1,8 @@
 import Content from "../models/Content.js";
 import Creator from "../models/Creator.js";
 import Subscription from "../models/Subscription.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
 
 // Return totals owned by the signed-in creator without exposing other creators' data.
 export const getCreatorAnalytics = asyncHandler(async (req, res) => {

@@ -2,10 +2,10 @@ import { fileTypeFromFile } from "file-type";
 import fs from "node:fs/promises";
 import MediaAsset from "../models/MediaAsset.js";
 import MediaDuplicateEvent from "../models/MediaDuplicateEvent.js";
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
-import validateObjectId from "../scripts/utils/validateObjectId.js";
+import ApiError from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
+import validateObjectId from "../utils/validateObjectId.js";
 import { mediaConfig } from "../config/media.js";
 import { enqueueMediaProcessing } from "../services/mediaQueue.js";
 import { validateMediaType } from "../services/mediaFingerprint.js";
@@ -42,19 +42,13 @@ export const createMediaUpload = asyncHandler(async (req, res) => {
     if (!fileType || !mediaType) {
       throw new ApiError(415, "Unsupported or unrecognized media file contents");
     }
-<<<<<<< HEAD
     
     if (
       req.file.mimetype !== fileType.mime ||
       !validateMediaType(fileType.mime, req.file.originalname, mediaType)
     ) {
       throw new ApiError(415, "File extension and declared MIME type must match the actual file");
-=======
-    if (!validateMediaType(fileType.mime, req.file.originalname, mediaType)) {
-      throw new ApiError(415, "File extension does not match the actual media contents");
->>>>>>> 745911a3b74bbdb7d5aa188e1a24a4c1a5f8a804
     }
-
     const creatorId = req.creator?._id;
     if (!creatorId) throw new ApiError(403, "An approved creator account is required");
     

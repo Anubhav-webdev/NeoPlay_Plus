@@ -3,10 +3,10 @@ import Creator from "../models/Creator.js";
 import Category from "../models/Category.js";
 import MediaAsset from "../models/MediaAsset.js";
 import Comment from "../models/Comment.js";
-import ApiError from "../scripts/utils/ApiError.js";
-import asyncHandler from "../scripts/utils/asyncHandler.js";
-import sendResponse from "../scripts/utils/sendResponse.js";
-import validateObjectId from "../scripts/utils/validateObjectId.js";
+import ApiError from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import sendResponse from "../utils/sendResponse.js";
+import validateObjectId from "../utils/validateObjectId.js";
 
 function pagination(query) {
   const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
