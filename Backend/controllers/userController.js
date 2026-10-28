@@ -1,4 +1,11 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileTypeFromFile } from "file-type";
+import sharp from "sharp";
 import User from "../models/users.js";
+import { mediaConfig } from "../config/media.js";
+import { deleteCloudinaryAsset, uploadBuffer } from "../services/cloudinaryService.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
@@ -48,7 +55,59 @@ export const updateProfile = asyncHandler(async (req, res) => {
     new: true,
     runValidators: true,
     select:
-      "_id name username email phoneNumber role isVerified createdAt updatedAt",
+      "_id name username email phoneNumber role avatar isVerified createdAt updatedAt",
   });
   return sendResponse(res, 200, "Profile updated", { user });
+});
+
+const AVATAR_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const AVATAR_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+
+export const uploadUserAvatar = asyncHandler(async (req, res) => {
+  const filePath = req.file?.path;
+  let uploadedAsset;
+  let profileSaved = false;
+  try {
+    if (!req.file) throw new ApiError(400, "A file field named file is required");
+    const detectedType = await fileTypeFromFile(filePath);
+    const extension = path.extname(req.file.originalname || "").toLowerCase();
+    if (!detectedType || !AVATAR_MIMES.has(detectedType.mime) || !AVATAR_EXTENSIONS.has(extension)) {
+      throw new ApiError(415, "Choose a JPEG, PNG, or WebP profile image");
+    }
+    if ((detectedType.mime === "image/jpeg" && ![".jpg", ".jpeg"].includes(extension)) ||
+        (detectedType.mime === "image/png" && extension !== ".png") ||
+        (detectedType.mime === "image/webp" && extension !== ".webp")) {
+      throw new ApiError(415, "The image extension must match its file type");
+    }
+    const image = sharp(filePath, { limitInputPixels: mediaConfig.maxImagePixels, failOn: "error" });
+    const metadata = await image.metadata();
+    if (!metadata.width || !metadata.height) throw new ApiError(415, "The selected file is not a valid image");
+    const buffer = await image.rotate().resize(512, 512, { fit: "cover", withoutEnlargement: true }).webp({ quality: 86, effort: 4 }).toBuffer();
+    uploadedAsset = await uploadBuffer(buffer, {
+      folder: "neoplay/users/" + req.user.id,
+      publicId: "avatar-" + randomUUID(),
+      resourceType: "image",
+      tags: ["neoplay-user-profile", "avatar"],
+    });
+    const user = await User.findById(req.user._id).select("+avatarPublicId");
+    if (!user) throw new ApiError(404, "User account not found");
+    const previousPublicId = user.avatarPublicId;
+    user.avatar = uploadedAsset.secure_url;
+    user.avatarPublicId = uploadedAsset.public_id;
+    await user.save();
+    profileSaved = true;
+    if (previousPublicId) {
+      await deleteCloudinaryAsset(previousPublicId, "image").catch((error) => {
+        console.error("Could not remove replaced user avatar", { userId: user.id, error });
+      });
+    }
+    const result = user.toObject();
+    delete result.avatarPublicId;
+    return sendResponse(res, 200, "Profile image updated", { user: result });
+  } finally {
+    if (filePath) await fs.rm(filePath, { force: true }).catch(() => {});
+    if (uploadedAsset && !profileSaved) {
+      await deleteCloudinaryAsset(uploadedAsset.public_id, "image").catch(() => {});
+    }
+  }
 });

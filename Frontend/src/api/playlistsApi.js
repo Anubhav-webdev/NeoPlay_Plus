@@ -5,11 +5,11 @@ export async function getMyPlaylists({ signal } = {}) {
   return result.data.playlists;
 }
 
-export async function createPlaylist(name, isPublic = false) {
+export async function createPlaylist(name, isPublic = false, description = "") {
   const result = await apiFetch("/playlists", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, isPublic }),
+    body: JSON.stringify({ name, isPublic, description }),
   });
   return result.data.playlist;
 }

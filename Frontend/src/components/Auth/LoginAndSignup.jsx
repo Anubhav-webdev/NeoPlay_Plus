@@ -110,6 +110,7 @@ const LoginAndSignup = () => {
           email: data.user.email,
           phone: data.user.phone,
           role: data.user.role || "user",
+          avatar: data.user.avatar || null,
         };
         sessionStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("loggedInUser", JSON.stringify(user));
@@ -158,7 +159,8 @@ const LoginAndSignup = () => {
           username: data.user.username, 
           email: data.user.email, 
           phone: data.user.phone, 
-          role: data.user.role || "user" 
+          role: data.user.role || "user",
+          avatar: data.user.avatar || null
         };
         
         localStorage.setItem("loggedInUser", JSON.stringify(newUser));

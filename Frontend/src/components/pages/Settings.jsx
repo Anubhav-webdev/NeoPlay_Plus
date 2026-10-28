@@ -1,4 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginSuccess } from '../../redux/slices/authSlice';
+import { uploadUserAvatar } from '../../api/mediaApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Bell, Sliders, Trophy, 
@@ -75,20 +78,34 @@ const AnimatedToggle = ({ checked, onChange }) => (
 export default function NeoPlayDashboard() {
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
+  const authUser = useSelector((state) => state.auth.user);
+  const dispatch = useDispatch();
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState('');
 
   // Core Profile States (With protected initial assets)
   const [profile, setProfile] = useState({
-    name: "Aria Vance",
-    username: "aria_codes",
+    name: authUser?.name || "Your profile",
+    username: authUser?.username || "",
     bio: "Digital architect & UI designer exploring interactive boundaries. Curating fresh digital media formats daily. 🌌",
     location: "Tokyo, Japan",
     tier: "Premium Pass",
-    avatar: DEFAULT_AVATAR,
+    avatar: authUser?.avatar || DEFAULT_AVATAR,
     banner: DEFAULT_BANNER
   });
 
   const [isEditing, setIsEditing] = useState(false);
   const [editBuffer, setEditBuffer] = useState({ ...profile });
+
+  useEffect(() => {
+    if (!authUser) return;
+    setProfile((current) => ({
+      ...current,
+      name: authUser.name || current.name,
+      username: authUser.username || current.username,
+      avatar: authUser.avatar || current.avatar,
+    }));
+  }, [authUser]);
 
   const [isFollowing, setIsFollowing] = useState(true);
   const [isDark, setIsDark] = useState(true);
@@ -145,12 +162,25 @@ export default function NeoPlayDashboard() {
     setIsEditing(false);
   };
 
-  // Safe handlers using dynamic conditional verification loops
-  const handleLocalAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const localImageUrl = URL.createObjectURL(file);
-      setEditBuffer(prev => ({ ...prev, avatar: localImageUrl }));
+  const handleLocalAvatarChange = async (e) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    setAvatarMessage('Uploading profile photo...');
+    try {
+      const updatedUser = await uploadUserAvatar(file);
+      const nextUser = { ...authUser, ...updatedUser, id: authUser?.id || updatedUser._id };
+      dispatch(loginSuccess(nextUser));
+      localStorage.setItem('loggedInUser', JSON.stringify(nextUser));
+      setProfile((current) => ({ ...current, avatar: updatedUser.avatar || DEFAULT_AVATAR }));
+      setEditBuffer((current) => ({ ...current, avatar: updatedUser.avatar || DEFAULT_AVATAR }));
+      setAvatarMessage('Profile photo saved.');
+    } catch (error) {
+      setAvatarMessage(error.message || 'Could not upload profile photo.');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -167,7 +197,8 @@ export default function NeoPlayDashboard() {
       <input 
         type="file" 
         ref={avatarInputRef} 
-        accept="image/*" 
+        accept="image/jpeg,image/png,image/webp"
+        disabled={isUploadingAvatar}
         className="hidden" 
         onChange={handleLocalAvatarChange} 
       />
@@ -221,10 +252,11 @@ export default function NeoPlayDashboard() {
                     className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white text-[10px] font-bold gap-1 cursor-pointer transition-opacity hover:bg-black/80"
                   >
                     <Camera className="w-4 h-4 text-cyan-400" />
-                    <span>UPLOAD</span>
+                    <span>{isUploadingAvatar ? 'SAVING' : 'UPLOAD'}</span>
                   </button>
                 )}
               </div>
+              {avatarMessage && <p role="status" className="relative z-10 mt-3 max-w-[12rem] text-center text-[10px] text-slate-300">{avatarMessage}</p>}
             </div>
 
             {/* Profile Text Display / Fields Grid */}

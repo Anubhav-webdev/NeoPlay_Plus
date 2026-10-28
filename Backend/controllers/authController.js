@@ -29,6 +29,7 @@ function publicUser(user) {
     email: user.email,
     phone: user.phoneNumber,
     role: user.role,
+    avatar: user.avatar || null,
     isVerified: user.isVerified,
   };
 }

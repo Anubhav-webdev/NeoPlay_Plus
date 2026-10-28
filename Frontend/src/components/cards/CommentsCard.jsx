@@ -15,6 +15,7 @@ function displayComment(comment) {
     id: comment._id,
     user: author.name || author.username || "User",
     handle: author.username ? `@${author.username}` : "",
+    avatar: author.avatar || "",
     text: comment.text,
     time: comment.createdAt,
     replies: [],
@@ -27,6 +28,7 @@ function displayReply(reply) {
     id: reply._id,
     user: author.name || author.username || "User",
     handle: author.username ? `@${author.username}` : "",
+    avatar: author.avatar || "",
     text: reply.text,
     time: reply.createdAt,
   };
@@ -188,9 +190,13 @@ export default function CommentsCard({ contentId, onCountChange }) {
             return (
               <article key={comment.id} className="border-b border-slate-800/60 pb-5 last:border-0">
                 <div className="flex gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-sm font-bold text-white">
-                    {comment.user.charAt(0).toUpperCase()}
-                  </div>
+                  {comment.avatar ? (
+                    <img src={comment.avatar} alt="Comment author profile photo" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-sm font-bold text-white">
+                      {comment.user.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 text-xs">
                       <span className="font-bold text-slate-200">{comment.user}</span>
@@ -242,13 +248,20 @@ export default function CommentsCard({ contentId, onCountChange }) {
                         {comment.replies.length === 0 ? (
                           <p className="text-xs text-slate-500">No replies yet.</p>
                         ) : comment.replies.map((reply) => (
-                          <div key={reply.id}>
+                          <div key={reply.id} className="flex gap-2.5">
+                            {reply.avatar ? (
+                              <img src={reply.avatar} alt="Reply author profile photo" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                            ) : (
+                              <div aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-300">{reply.user.charAt(0).toUpperCase()}</div>
+                            )}
+                            <div>
                             <div className="flex flex-wrap items-center gap-x-2 text-xs">
                               <span className="font-semibold text-slate-300">{reply.user}</span>
                               {reply.handle && <span className="text-slate-500">{reply.handle}</span>}
                               <time className="text-slate-600">{formatTime(reply.time)}</time>
                             </div>
                             <p className="mt-1 break-words text-sm text-slate-400">{reply.text}</p>
+                            </div>
                           </div>
                         ))}
                       </div>

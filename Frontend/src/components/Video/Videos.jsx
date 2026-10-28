@@ -34,7 +34,7 @@ async function loadPublishedVideos(signal) {
     time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
     channel: item.creatorId?.displayName || "Creator",
     avatar: item.creatorId?.avatar || "",
-    thumb: item.thumbnailUrl || item.mediaUrl,
+    thumb: item.thumbnailUrl || item.thumbnailAssetId?.secureUrl || "",
     src: item.mediaUrl,
     duration: item.mediaAssetId?.metadata?.duration
       ? `${Math.floor(item.mediaAssetId.metadata.duration / 60)}:${String(Math.floor(item.mediaAssetId.metadata.duration % 60)).padStart(2, "0")}`

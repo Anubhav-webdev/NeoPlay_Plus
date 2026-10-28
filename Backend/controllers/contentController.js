@@ -7,6 +7,23 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import cloudinary from "../config/cloudinary.js";
+
+function toContentObject(content) {
+  const value = content.toObject ? content.toObject() : content;
+  const thumbnailAssetUrl = value.thumbnailAssetId?.secureUrl;
+  const generatedVideoPoster = value.type === "Video" && value.mediaPublicId
+    ? cloudinary.url(value.mediaPublicId, {
+        resource_type: "video",
+        format: "jpg",
+        transformation: [{ start_offset: "0" }],
+      })
+    : null;
+  return {
+    ...value,
+    thumbnailUrl: value.thumbnailUrl || thumbnailAssetUrl || generatedVideoPoster || null,
+  };
+}
 
 function pagination(query) {
   const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
@@ -54,7 +71,8 @@ export const listContent = asyncHandler(async (req, res) => {
       .limit(limit)
       .populate("creatorId", "displayName avatar")
       .populate("categoryIds", "name slug")
-      .populate("mediaAssetId", "mediaType metadata"),
+      .populate("mediaAssetId", "mediaType metadata")
+      .populate("thumbnailAssetId", "secureUrl"),
     Content.countDocuments(filter),
   ]);
   const commentCounts = await Comment.aggregate([
@@ -66,7 +84,7 @@ export const listContent = asyncHandler(async (req, res) => {
   );
   return sendResponse(res, 200, "Content retrieved", {
     items: items.map((item) => ({
-      ...item.toObject(),
+      ...toContentObject(item),
       commentCount: countsByContentId.get(String(item._id)) || 0,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
@@ -77,7 +95,8 @@ export const getContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
   const content = await Content.findById(req.params.contentId)
     .populate("creatorId", "displayName avatar")
-    .populate("categoryIds", "name slug");
+    .populate("categoryIds", "name slug")
+    .populate("thumbnailAssetId", "secureUrl");
   if (!content) throw new ApiError(404, "Content not found");
 
   if (content.status !== "published" && req.user?.role !== "admin") {
@@ -90,7 +109,9 @@ export const getContent = asyncHandler(async (req, res) => {
       }));
     if (!ownedCreator) throw new ApiError(404, "Content not found");
   }
-  return sendResponse(res, 200, "Content retrieved", { content });
+  return sendResponse(res, 200, "Content retrieved", {
+    content: toContentObject(content),
+  });
 });
 
 export const listMyContent = asyncHandler(async (req, res) => {
@@ -103,11 +124,12 @@ export const listMyContent = asyncHandler(async (req, res) => {
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("categoryIds", "name slug"),
+      .populate("categoryIds", "name slug")
+      .populate("thumbnailAssetId", "secureUrl"),
     Content.countDocuments({ creatorId: creator._id, status: { $ne: "archived" } }),
   ]);
   return sendResponse(res, 200, "Creator content retrieved", {
-    items,
+    items: items.map(toContentObject),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 });

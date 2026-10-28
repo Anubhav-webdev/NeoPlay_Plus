@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+const playlistNoteSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, maxlength: 100 },
+    content: { type: String, trim: true, maxlength: 5000, default: "" },
+  },
+  { timestamps: true },
+);
+
 const playlistSchema = new mongoose.Schema(
   {
     name: {
@@ -8,6 +16,8 @@ const playlistSchema = new mongoose.Schema(
       trim: true,
       maxlength: 150,
     },
+
+    description: { type: String, trim: true, maxlength: 2000, default: "" },
 
     isPublic: {
       type: Boolean,
@@ -21,6 +31,8 @@ const playlistSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+
+    notes: { type: [playlistNoteSchema], default: [] },
 
     contentIds: [
       {

@@ -107,6 +107,7 @@ export const uploadCreatorProfileImage = asyncHandler(async (req, res) => {
   const filePath = req.file?.path;
   let uploadedAsset;
   let profileSaved = false;
+  let preservePreviousPublicId = false;
   try {
     const imageType = PROFILE_IMAGE_TYPES[req.params.imageType];
     if (!imageType) throw new ApiError(400, "Image type must be avatar or banner");
@@ -157,7 +158,26 @@ export const uploadCreatorProfileImage = asyncHandler(async (req, res) => {
     creator[imageType.publicIdField] = uploadedAsset.public_id;
     await creator.save();
     profileSaved = true;
-    if (previousPublicId) {
+    if (req.params.imageType === "avatar") {
+      try {
+        const user = await User.findById(creator.userId).select("+avatarPublicId");
+        if (user) {
+          const previousUserAvatarId = user.avatarPublicId;
+          user.avatar = uploadedAsset.secure_url;
+          user.avatarPublicId = uploadedAsset.public_id;
+          await user.save();
+          if (previousUserAvatarId && previousUserAvatarId !== previousPublicId) {
+            await deleteCloudinaryAsset(previousUserAvatarId, "image").catch((error) => {
+              console.error("Could not remove replaced user avatar", { userId: user.id, error });
+            });
+          }
+        }
+      } catch (error) {
+        preservePreviousPublicId = true;
+        console.error("Could not sync creator photo to user profile", { creatorId: creator.id, error });
+      }
+    }
+    if (previousPublicId && !preservePreviousPublicId) {
       await deleteCloudinaryAsset(previousPublicId, "image").catch((error) => {
         console.error("Could not remove replaced creator profile image", {
           creatorId: creator.id,

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Video, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud, Send } from 'lucide-react';
 import { FiTwitter } from 'react-icons/fi';
@@ -12,8 +13,19 @@ export default function ContentCatalogStream({
   handlePublishDraft, publishingContentId,
   editFormState, setEditFormState, editFileInputRef, editMediaFile,
   handleEditMediaFileChange, editUploadStatus, isSavingEdit,
+  editThumbnailFile, handleEditThumbnailFileChange, categories = [],
   saveEditedAsset, cancelEditingAsset, typeAccent
 }) {
+  const [thumbnailPreview, setThumbnailPreview] = useState('');
+  useEffect(() => {
+    if (!editThumbnailFile) {
+      setThumbnailPreview('');
+      return undefined;
+    }
+    const objectUrl = URL.createObjectURL(editThumbnailFile);
+    setThumbnailPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [editThumbnailFile]);
   return (
     <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-[24px] shadow-2xl overflow-hidden">
       <div className="p-4 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -97,6 +109,24 @@ export default function ContentCatalogStream({
                           <textarea value={editFormState.description || ''} maxLength={5000} onChange={(e) => setEditFormState({ ...editFormState, description: e.target.value })} className="mb-3 h-20 w-full resize-y rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none" />
                         </div>
                       )}
+                      {editFormState.type !== 'tweet' && (
+                        <div>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
+                          <select value={editFormState.categoryId || ''} onChange={(e) => setEditFormState({ ...editFormState, categoryId: e.target.value })} disabled={isSavingEdit} className="mb-3 w-full rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none">
+                            <option value="">Uncategorized</option>
+                            {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+
+                      {editFormState.type === 'video' && (
+                        <label className="mb-3 flex min-h-20 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-800 bg-slate-900 p-2 text-left hover:border-purple-500/50">
+                          {thumbnailPreview || editFormState.thumbnail ? <img src={thumbnailPreview || editFormState.thumbnail} alt={editThumbnailFile ? "Selected video thumbnail preview" : "Current video thumbnail"} className="h-14 w-24 rounded object-cover" /> : <span className="flex h-14 w-24 items-center justify-center rounded bg-slate-950 text-slate-500"><Video className="h-4 w-4" /></span>}
+                          <span className="min-w-0 text-[9px] text-slate-400">{editThumbnailFile ? editThumbnailFile.name : 'Choose a replacement thumbnail image'}</span>
+                          <input type="file" accept={IMAGE_UPLOAD_ACCEPT} onChange={handleEditThumbnailFileChange} disabled={isSavingEdit} className="hidden" />
+                        </label>
+                      )}
+
                       {editFormState.type !== 'tweet' && (
                         <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-900 p-2 text-center hover:border-purple-500/50">
                           <UploadCloud className="mb-0.5 h-4 w-4 text-slate-600" />

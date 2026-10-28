@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { TrendingUp, MessageSquare, CornerDownRight } from 'lucide-react';
 
-export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredComments, submitReplyToComment }) {
+export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredComments, submitReplyToComment, creatorAvatar }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* CHANNEL ADVICE */}
@@ -52,7 +52,7 @@ export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredCo
               <div key={comment.id} className="p-4 space-y-3">
                 <div className="flex justify-between items-start flex-wrap gap-3">
                   <div className="flex gap-3">
-                    <img src={comment.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=user"} alt="User Matrix" className="w-8 h-8 rounded-xl bg-slate-950 border border-slate-800/80" />
+                    {comment.avatar ? <img src={comment.avatar} alt="Comment author profile photo" className="w-8 h-8 rounded-xl object-cover bg-slate-950 border border-slate-800/80" /> : <div aria-hidden="true" className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">{comment.author.charAt(0).toUpperCase()}</div>}
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-200">{comment.author}</span>
@@ -66,6 +66,7 @@ export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredCo
 
                 {comment.replyText ? (
                   <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="ml-11 p-3 bg-slate-950 border border-purple-500/20 rounded-xl text-xs flex items-start gap-2">
+                    {comment.replyAvatar || creatorAvatar ? <img src={comment.replyAvatar || creatorAvatar} alt="Creator profile photo" className="w-7 h-7 rounded-full object-cover flex-shrink-0" /> : <div aria-hidden="true" className="w-7 h-7 rounded-full bg-purple-950 text-purple-200 flex items-center justify-center text-[10px] font-bold">C</div>}
                     <CornerDownRight className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
                     <div>
                       <span className="text-[9px] font-bold uppercase text-purple-400 block tracking-widest mb-0.5">Studio Reply Committed</span>

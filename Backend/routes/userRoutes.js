@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { getProfile, updateProfile } from "../controllers/userController.js";
+import { getProfile, updateProfile, uploadUserAvatar } from "../controllers/userController.js";
+import { receiveProfileImageFile, requireReceivedMedia } from "../middlewares/uploadMiddleware.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
 
 const router = Router();
@@ -8,5 +9,6 @@ const router = Router();
 router.use(authenticate);
 router.get("/me", getProfile);
 router.patch("/me", updateProfile);
+router.post("/me/avatar", receiveProfileImageFile, requireReceivedMedia, uploadUserAvatar);
 
 export default router;

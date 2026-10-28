@@ -23,7 +23,7 @@ function mapPlaylist(playlist) {
     ...content,
     id: content._id,
     type: content.type?.toLowerCase(),
-    thumb: content.thumbnailUrl || content.mediaUrl,
+    thumb: content.thumbnailUrl || content.thumbnailAssetId?.secureUrl || "",
     src: content.mediaUrl,
     channel: content.creatorId?.displayName || "Creator",
   }));
@@ -32,6 +32,14 @@ function mapPlaylist(playlist) {
     name: playlist.name,
     visibility: playlist.isPublic ? "public" : "private",
     count: items.length,
+    description: playlist.description || "",
+    notes: (playlist.notes || []).map((note) => ({
+      id: String(note._id || note.id),
+      playlistId: playlist._id,
+      title: note.title || "Untitled note",
+      content: note.content || "",
+      updatedAt: note.updatedAt ? new Date(note.updatedAt).toLocaleString() : "just now",
+    })),
     items,
   };
 }
@@ -42,7 +50,7 @@ export default function PlaylistDashboard() {
   const [playlists, setPlaylists] = useState([]);
   const [activePlaylistId, setActivePlaylistId] = useState(null);
   const [activeTab, setActiveTab] = useState("media");
-  const [notes, setNotes] = useState([]);
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
   const [loadedUserId, setLoadedUserId] = useState(null);
   const [error, setError] = useState("");
   const userId = user?._id || user?.id;
@@ -55,6 +63,7 @@ export default function PlaylistDashboard() {
   const [editPlaylistName, setEditPlaylistName] = useState("");
   const [fullEditPlaylist, setFullEditPlaylist] = useState(null);
   const [draftName, setDraftName] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
   const [draftVisibility, setDraftVisibility] = useState("private");
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteDraft, setNoteDraft] = useState({ title: "", content: "" });
@@ -83,30 +92,22 @@ export default function PlaylistDashboard() {
     return () => controller.abort();
   }, [user, userId]);
 
-  const createPlaylist = async () => {
-    try {
-      const playlist = mapPlaylist(await createPlaylistRequest("New Playlist"));
-      setPlaylists((current) => [playlist, ...current]);
-      setActivePlaylistId(playlist.id);
-      setActiveTab("media");
-      setEditingPlaylistId(playlist.id);
-      setEditPlaylistName(playlist.name);
-      setError("");
-    } catch (requestError) {
-      setError(requestError.message);
-    }
+  const createPlaylist = () => {
+    setIsCreatingPlaylist(true);
+    setFullEditPlaylist("new");
+    setDraftName("");
+    setDraftDescription("");
+    setDraftVisibility("private");
+    setError("");
   };
 
   const deletePlaylist = async (id, event) => {
     event?.stopPropagation();
     try {
       await deletePlaylistRequest(id);
-      setPlaylists((current) => {
-        const remaining = current.filter((playlist) => playlist.id !== id);
-        if (activePlaylistId === id) setActivePlaylistId(remaining[0]?.id || null);
-        return remaining;
-      });
-      setNotes((current) => current.filter((note) => note.playlistId !== id));
+      const remaining = playlists.filter((playlist) => playlist.id !== id);
+      setPlaylists(remaining);
+      if (activePlaylistId === id) setActivePlaylistId(remaining[0]?.id || null);
       setError("");
     } catch (requestError) {
       setError(requestError.message);
@@ -125,21 +126,43 @@ export default function PlaylistDashboard() {
   };
 
   const openFullEdit = (playlist) => {
+    setIsCreatingPlaylist(false);
     setFullEditPlaylist(playlist.id);
     setDraftName(playlist.name);
+    setDraftDescription(playlist.description || "");
     setDraftVisibility(playlist.visibility);
+    setError("");
+  };
+
+  const closePlaylistModal = () => {
+    setIsCreatingPlaylist(false);
+    setFullEditPlaylist(null);
   };
 
   const saveFullEdit = async () => {
     try {
+      if (isCreatingPlaylist) {
+        const created = mapPlaylist(await createPlaylistRequest(
+          draftName,
+          draftVisibility === "public",
+          draftDescription,
+        ));
+        setPlaylists((current) => [created, ...current]);
+        setActivePlaylistId(created.id);
+        setActiveTab("media");
+        closePlaylistModal();
+        setError("");
+        return;
+      }
       const updated = mapPlaylist(await updatePlaylistRequest(fullEditPlaylist, {
         name: draftName,
+        description: draftDescription,
         isPublic: draftVisibility === "public",
       }));
       setPlaylists((current) => current.map((playlist) =>
         playlist.id === fullEditPlaylist ? updated : playlist,
       ));
-      setFullEditPlaylist(null);
+      closePlaylistModal();
       setError("");
     } catch (requestError) {
       setError(requestError.message);
@@ -202,32 +225,61 @@ export default function PlaylistDashboard() {
     }
   };
 
-  const addNote = () => {
-    const note = { id: Date.now(), playlistId: activePlaylistId, title: "New note", content: "", updatedAt: "now" };
-    setNotes((current) => [note, ...current]);
-    setEditingNoteId(note.id);
-    setNoteDraft({ title: note.title, content: "" });
+  const addNote = async () => {
+    if (!activePlaylist) return;
+    try {
+      const notes = [
+        { title: "New note", content: "" },
+        ...activePlaylist.notes.map((note) => ({ _id: note.id, title: note.title, content: note.content })),
+      ];
+      const saved = mapPlaylist(await updatePlaylistRequest(activePlaylist.id, { notes }));
+      setPlaylists((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setEditingNoteId(saved.notes[0]?.id || null);
+      setNoteDraft({ title: saved.notes[0]?.title || "New note", content: "" });
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
   const startEditNote = (note) => {
     setEditingNoteId(note.id);
     setNoteDraft({ title: note.title, content: note.content });
   };
-  const saveNote = (id) => {
-    setNotes((current) => current.map((note) => note.id === id
-      ? { ...note, title: noteDraft.title || "Untitled note", content: noteDraft.content, updatedAt: "now" }
-      : note));
-    setEditingNoteId(null);
+  const saveNote = async (id) => {
+    if (!activePlaylist) return;
+    try {
+      const notes = activePlaylist.notes.map((note) => ({
+        _id: note.id,
+        title: note.id === id ? (noteDraft.title.trim() || "Untitled note") : note.title,
+        content: note.id === id ? noteDraft.content : note.content,
+      }));
+      const saved = mapPlaylist(await updatePlaylistRequest(activePlaylist.id, { notes }));
+      setPlaylists((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setEditingNoteId(null);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
-  const deleteNote = (id) => {
-    setNotes((current) => current.filter((note) => note.id !== id));
-    if (editingNoteId === id) setEditingNoteId(null);
+  const deleteNote = async (id) => {
+    if (!activePlaylist) return;
+    try {
+      const notes = activePlaylist.notes.filter((note) => note.id !== id)
+        .map((note) => ({ _id: note.id, title: note.title, content: note.content }));
+      const saved = mapPlaylist(await updatePlaylistRequest(activePlaylist.id, { notes }));
+      setPlaylists((current) => current.map((item) => item.id === saved.id ? saved : item));
+      if (editingNoteId === id) setEditingNoteId(null);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId);
   const activeMedia = (activePlaylist?.items || []).filter((item) =>
     item.title.toLowerCase().includes(searchTerm.toLowerCase()),
   );
-  const activeNotes = notes.filter((note) => note.playlistId === activePlaylistId);
+  const activeNotes = activePlaylist?.notes || [];
 
   if (!user) {
     return (
@@ -341,7 +393,6 @@ export default function PlaylistDashboard() {
             </>
           ) : (
             <>
-              <p className="mb-3 text-xs text-gray-500">Notes are not saved to the server and will be lost when you leave this page.</p>
               <NotesGrid
                 activeNotes={activeNotes}
                 editingNoteId={editingNoteId}
@@ -357,10 +408,15 @@ export default function PlaylistDashboard() {
         </div>
       </main>
       <EditPlaylistModal
-        fullEditPlaylist={fullEditPlaylist}
+        fullEditPlaylist={isCreatingPlaylist ? "new" : fullEditPlaylist}
         setFullEditPlaylist={setFullEditPlaylist}
+        isCreating={isCreatingPlaylist}
+        onClose={closePlaylistModal}
+        error={error}
         draftName={draftName}
         setDraftName={setDraftName}
+        draftDescription={draftDescription}
+        setDraftDescription={setDraftDescription}
         draftVisibility={draftVisibility}
         setDraftVisibility={setDraftVisibility}
         saveFullEdit={saveFullEdit}

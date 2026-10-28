@@ -75,6 +75,13 @@ export async function updateMyCreatorProfile(profile) {
   return result.data.creator;
 }
 
+export async function uploadUserAvatar(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const result = await apiFetch("/users/me/avatar", { method: "POST", body: formData });
+  return result.data.user;
+}
+
 export async function uploadCreatorProfileImage(file, imageType) {
   const formData = new FormData();
   formData.append("file", file);

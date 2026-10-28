@@ -22,7 +22,7 @@ export const listComments = asyncHandler(async (req, res) => {
   );
   const [comments, total] = await Promise.all([
     Comment.find({ contentId: content._id })
-      .populate("userId", "name username")
+      .populate("userId", "name username avatar")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
@@ -51,7 +51,7 @@ export const listMyCreatorComments = asyncHandler(async (req, res) => {
   const filter = { contentId: { $in: contentIds } };
   const [comments, total] = await Promise.all([
     Comment.find(filter)
-      .populate("userId", "name username")
+      .populate("userId", "name username avatar")
       .populate("contentId", "title type")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
@@ -61,7 +61,7 @@ export const listMyCreatorComments = asyncHandler(async (req, res) => {
   const replies = await ReplyComment.find({
     commentId: { $in: comments.map((comment) => comment._id) },
   })
-    .populate("userId", "name username")
+    .populate("userId", "name username avatar")
     .sort({ createdAt: 1 });
   const repliesByComment = new Map();
   for (const reply of replies) {
@@ -102,7 +102,7 @@ export const createComment = asyncHandler(async (req, res) => {
       message: "Someone commented on your content",
     });
   }
-  await comment.populate("userId", "name username");
+  await comment.populate("userId", "name username avatar");
   return sendResponse(res, 201, "Comment created", { comment });
 });
 
@@ -125,14 +125,14 @@ export const createReply = asyncHandler(async (req, res) => {
       message: "Someone replied to your comment",
     });
   }
-  await reply.populate("userId", "name username");
+  await reply.populate("userId", "name username avatar");
   return sendResponse(res, 201, "Reply created", { reply });
 });
 
 export const listReplies = asyncHandler(async (req, res) => {
   validateObjectId(req.params.commentId, "commentId");
   const replies = await ReplyComment.find({ commentId: req.params.commentId })
-    .populate("userId", "name username")
+    .populate("userId", "name username avatar")
     .sort({ createdAt: 1 });
   return sendResponse(res, 200, "Replies retrieved", { replies });
 });

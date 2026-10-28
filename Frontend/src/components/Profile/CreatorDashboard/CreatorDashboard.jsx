@@ -82,6 +82,9 @@ function CreatorStudio({ creator, user }) {
   const [pendingUploadId, setPendingUploadId] = useState(null);
   const [verifiedMediaAssetId, setVerifiedMediaAssetId] = useState(null);
   const [editMediaFile, setEditMediaFile] = useState(null);
+  const [editThumbnailFile, setEditThumbnailFile] = useState(null);
+  const [editThumbnailPendingUploadId, setEditThumbnailPendingUploadId] = useState(null);
+  const [editThumbnailAssetId, setEditThumbnailAssetId] = useState(null);
   const [editPendingUploadId, setEditPendingUploadId] = useState(null);
   const [editVerifiedMediaAssetId, setEditVerifiedMediaAssetId] = useState(null);
   const [editUploadStatus, setEditUploadStatus] = useState('');
@@ -120,6 +123,8 @@ function CreatorStudio({ creator, user }) {
               ? new Date(content.createdAt).toLocaleDateString()
               : '',
             category: content.categoryIds?.[0]?.name || '',
+            categoryId: content.categoryIds?.[0]?._id || '',
+            thumbnailAssetId: content.thumbnailAssetId?._id || content.thumbnailAssetId || '',
             isSubscriberOnly: false,
             mediaUrl: content.mediaUrl || '',
             thumbnail: type === 'video'
@@ -170,9 +175,11 @@ function CreatorStudio({ creator, user }) {
             type: comment.contentId?.type?.toLowerCase() || "",
             author: author.name || author.username || "User",
             handle: author.username ? `@${author.username}` : "",
+            avatar: author.avatar || "",
             text: comment.text,
             assetTitle: comment.contentId?.title || "Published content",
             replyText: ownReplies.at(-1)?.text || "",
+            replyAvatar: ownReplies.at(-1)?.userId?.avatar || creator.avatar || "",
           };
         }));
       })
@@ -394,6 +401,9 @@ function CreatorStudio({ creator, user }) {
     setEditingItemId(asset.id);
     setEditFormState({ ...asset });
     setEditMediaFile(null);
+    setEditThumbnailFile(null);
+    setEditThumbnailPendingUploadId(null);
+    setEditThumbnailAssetId(null);
     setEditPendingUploadId(null);
     setEditVerifiedMediaAssetId(null);
     setEditUploadStatus('');
@@ -403,6 +413,9 @@ function CreatorStudio({ creator, user }) {
     setEditingItemId(null);
     setEditFormState({});
     setEditMediaFile(null);
+    setEditThumbnailFile(null);
+    setEditThumbnailPendingUploadId(null);
+    setEditThumbnailAssetId(null);
     setEditPendingUploadId(null);
     setEditVerifiedMediaAssetId(null);
     setEditUploadStatus('');
@@ -415,6 +428,7 @@ function CreatorStudio({ creator, user }) {
     }
     setIsSavingEdit(true);
     setEditUploadStatus(editMediaFile ? "Preparing replacement media" : "Saving changes");
+    let editUploadKind = null;
     try {
       let mediaAssetId = editVerifiedMediaAssetId;
       if (editMediaFile && !mediaAssetId) {
@@ -425,7 +439,9 @@ function CreatorStudio({ creator, user }) {
           setEditPendingUploadId(uploadId);
         }
         setEditUploadStatus("Verifying replacement media");
+        editUploadKind = "media";
         const verifiedUpload = await waitForMediaUpload(uploadId, setEditUploadStatus);
+        editUploadKind = null;
         if (verifiedUpload.reviewPending) {
           setEditUploadStatus("Possible duplicate: waiting for moderator review. Save again after review.");
           throw new Error("Possible duplicate: replacement media is waiting for moderator review.");
@@ -435,12 +451,39 @@ function CreatorStudio({ creator, user }) {
         setEditPendingUploadId(null);
       }
 
+      let thumbnailAssetId = editThumbnailAssetId;
+      if (editFormState.type === 'video' && editThumbnailFile && !thumbnailAssetId) {
+        let uploadId = editThumbnailPendingUploadId;
+        if (!uploadId) {
+          const queuedUpload = await uploadMedia(editThumbnailFile);
+          uploadId = queuedUpload.uploadId;
+          setEditThumbnailPendingUploadId(uploadId);
+        }
+        setEditUploadStatus("Verifying replacement thumbnail");
+        editUploadKind = "thumbnail";
+        const verifiedThumbnail = await waitForMediaUpload(uploadId, setEditUploadStatus);
+        editUploadKind = null;
+        if (verifiedThumbnail.reviewPending) {
+          throw new Error("The thumbnail is waiting for duplicate review. Try again after review.");
+        }
+        if (verifiedThumbnail.mediaType !== 'image') {
+          throw new Error("Choose a supported image file for the video thumbnail.");
+        }
+        thumbnailAssetId = verifiedThumbnail._id;
+        setEditThumbnailAssetId(thumbnailAssetId);
+        setEditThumbnailPendingUploadId(null);
+      }
+
       const payload = {
         title: editFormState.title.trim(),
         description: editFormState.type === 'tweet'
           ? editFormState.title.trim()
           : (editFormState.description || '').trim(),
+        categoryIds: editFormState.type !== 'tweet' && editFormState.categoryId
+          ? [editFormState.categoryId]
+          : [],
         ...(mediaAssetId ? { mediaAssetId } : {}),
+        ...(thumbnailAssetId ? { thumbnailAssetId } : {}),
       };
       const updated = await updateContentRecord(editingItemId, payload);
       setContentCatalog((items) => items.map((item) => item.id === editingItemId
@@ -449,8 +492,11 @@ function CreatorStudio({ creator, user }) {
           title: updated.title,
           description: updated.description || '',
           status: updated.status || item.status,
+          categoryId: editFormState.categoryId || '',
+          category: categories.find((category) => category._id === editFormState.categoryId)?.name || '',
           mediaUrl: updated.mediaUrl || '',
-          thumbnail: updated.thumbnailUrl || updated.mediaUrl || '',
+          thumbnail: updated.thumbnailUrl || (item.type === 'image' ? updated.mediaUrl || '' : ''),
+          thumbnailAssetId: updated.thumbnailAssetId || item.thumbnailAssetId || '',
           images: item.type === 'image' && updated.mediaUrl ? [updated.mediaUrl] : [],
         }
         : item));
@@ -458,8 +504,13 @@ function CreatorStudio({ creator, user }) {
       showToast("Content updated.", "green");
     } catch (error) {
       if (["duplicate", "failed"].includes(error.uploadStatus)) {
-        setEditPendingUploadId(null);
-        setEditVerifiedMediaAssetId(null);
+        if (editUploadKind === "thumbnail") {
+          setEditThumbnailPendingUploadId(null);
+          setEditThumbnailAssetId(null);
+        } else {
+          setEditPendingUploadId(null);
+          setEditVerifiedMediaAssetId(null);
+        }
       }
       if (!error.uploadStatus && !error.message?.includes("waiting for moderator review")) {
         setEditUploadStatus(error.message || "Could not save changes.");
@@ -472,10 +523,21 @@ function CreatorStudio({ creator, user }) {
 
   const handleEditMediaFileChange = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     setEditMediaFile(file);
     setEditPendingUploadId(null);
     setEditVerifiedMediaAssetId(null);
+    setEditUploadStatus('');
+  };
+
+  const handleEditThumbnailFileChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setEditThumbnailFile(file);
+    setEditThumbnailPendingUploadId(null);
+    setEditThumbnailAssetId(null);
     setEditUploadStatus('');
   };
 
@@ -589,6 +651,9 @@ function CreatorStudio({ creator, user }) {
               editFormState={editFormState} setEditFormState={setEditFormState}
               editFileInputRef={editFileInputRef}
               editMediaFile={editMediaFile}
+              editThumbnailFile={editThumbnailFile}
+              handleEditThumbnailFileChange={handleEditThumbnailFileChange}
+              categories={categories}
               handleEditMediaFileChange={handleEditMediaFileChange}
               editUploadStatus={editUploadStatus}
               isSavingEdit={isSavingEdit}
@@ -599,6 +664,7 @@ function CreatorStudio({ creator, user }) {
         </div>
 
         <DiagnosticMatrix 
+          creatorAvatar={channelIdentity.avatar}
           commentTab={commentTab} setCommentTab={setCommentTab}
           filteredComments={filteredComments} submitReplyToComment={submitReplyToComment}
         />

@@ -52,7 +52,7 @@ export default function VideoDetail() {
             creatorId: item.creatorId?._id,
             avatar: item.creatorId?.avatar || "",
             description: item.description || "",
-            thumb: item.thumbnailUrl || item.mediaUrl,
+            thumb: item.thumbnailUrl || item.thumbnailAssetId?.secureUrl || "",
             src: item.mediaUrl,
             category: item.categoryIds?.[0]?.name || "General",
             createdAt: item.publishedAt || item.createdAt,
@@ -80,7 +80,7 @@ export default function VideoDetail() {
             title: item.title,
             views: item.viewCount || 0,
             channel: item.creatorId?.displayName || "Creator",
-            thumb: item.thumbnailUrl || item.mediaUrl,
+            thumb: item.thumbnailUrl || item.thumbnailAssetId?.secureUrl || "",
             duration: item.mediaAssetId?.metadata?.duration
               ? `${Math.floor(item.mediaAssetId.metadata.duration / 60)}:${String(Math.floor(item.mediaAssetId.metadata.duration % 60)).padStart(2, "0")}`
               : "",

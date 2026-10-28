@@ -117,6 +117,7 @@ const authSlice = createSlice({
           email: action.payload.user?.email,
           phone: action.payload.user?.phone,
           role: action.payload.user?.role || "user",
+          avatar: action.payload.user?.avatar || null,
         };
         state.isAuthenticated = true;
         state.initialized = true;
