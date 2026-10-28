@@ -1,5 +1,5 @@
 import cloudinary from "../config/cloudinary.js";
-import ApiError from "../utils/ApiError.js";
+import ApiError from "../scripts/utils/ApiError.js";
 import path from "node:path";
 
 function assertConfigured() {

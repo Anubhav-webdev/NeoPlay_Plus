@@ -1,4 +1,4 @@
-import ApiError from "../utils/ApiError.js";
+import ApiError from "../scripts/utils/ApiError.js";
 
 // Hide internal error details in production while preserving useful server logs.
 export default function errorHandler(error, req, res, next) {

@@ -1,9 +1,9 @@
 import WatchHistory from "../models/WatchHistory.js";
 import Content from "../models/Content.js";
-import ApiError from "../utils/ApiError.js";
-import asyncHandler from "../utils/asyncHandler.js";
-import sendResponse from "../utils/sendResponse.js";
-import validateObjectId from "../utils/validateObjectId.js";
+import ApiError from "../scripts/utils/ApiError.js";
+import asyncHandler from "../scripts/utils/asyncHandler.js";
+import sendResponse from "../scripts/utils/sendResponse.js";
+import validateObjectId from "../scripts/utils/validateObjectId.js";
 
 export const listWatchHistory = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);

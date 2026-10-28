@@ -1,6 +1,6 @@
 import Creator from "../models/Creator.js";
-import ApiError from "../utils/ApiError.js";
-import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../scripts/utils/ApiError.js";
+import asyncHandler from "../scripts/utils/asyncHandler.js";
 
 // Restrict endpoints to users with one of the listed account roles.
 export function allowRoles(...roles) {

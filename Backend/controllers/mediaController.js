@@ -2,10 +2,10 @@ import { fileTypeFromFile } from "file-type";
 import fs from "node:fs/promises";
 import MediaAsset from "../models/MediaAsset.js";
 import MediaDuplicateEvent from "../models/MediaDuplicateEvent.js";
-import ApiError from "../utils/ApiError.js";
-import asyncHandler from "../utils/asyncHandler.js";
-import sendResponse from "../utils/sendResponse.js";
-import validateObjectId from "../utils/validateObjectId.js";
+import ApiError from "../scripts/utils/ApiError.js";
+import asyncHandler from "../scripts/utils/asyncHandler.js";
+import sendResponse from "../scripts/utils/sendResponse.js";
+import validateObjectId from "../scripts/utils/validateObjectId.js";
 import { mediaConfig } from "../config/media.js";
 import { enqueueMediaProcessing } from "../services/mediaQueue.js";
 import { validateMediaType } from "../services/mediaFingerprint.js";
@@ -35,11 +35,14 @@ export const createMediaUpload = asyncHandler(async (req, res) => {
   let asset;
   try {
     if (!req.file) throw new ApiError(400, "A file field named 'file' is required");
+    
     const fileType = await fileTypeFromFile(filePath);
     const mediaType = fileType && mimeToKind.get(fileType.mime);
+    
     if (!fileType || !mediaType) {
       throw new ApiError(415, "Unsupported or unrecognized media file contents");
     }
+    
     if (
       req.file.mimetype !== fileType.mime ||
       !validateMediaType(fileType.mime, req.file.originalname, mediaType)
@@ -49,8 +52,10 @@ export const createMediaUpload = asyncHandler(async (req, res) => {
 
     const creatorId = req.creator?._id;
     if (!creatorId) throw new ApiError(403, "An approved creator account is required");
+    
     const sha256 = await hashFile(filePath);
     const existing = await MediaAsset.findOne({ sha256 }).select("+sha256");
+    
     if (existing) {
       await MediaDuplicateEvent.create({
         ownerId: req.user._id,
@@ -122,10 +127,13 @@ export const getMediaUploadStatus = asyncHandler(async (req, res) => {
   validateObjectId(req.params.uploadId, "uploadId");
   const filter = { _id: req.params.uploadId };
   if (req.user.role !== "admin") filter.ownerId = req.user._id;
+  
   const asset = await MediaAsset.findOne(filter)
     .select("-sha256 -fingerprints -fingerprintBands -stagedPath -pendingCloudinaryPublicId")
     .populate("duplicateDecision.matchAssetId", "mediaType status");
+    
   if (!asset) throw new ApiError(404, "Upload not found");
+  
   return sendResponse(res, 200, "Upload status", {
     upload: asset,
     ready: asset.status === "ready",
@@ -135,6 +143,7 @@ export const getMediaUploadStatus = asyncHandler(async (req, res) => {
 export const listDuplicateReviews = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+  
   const [uploads, total] = await Promise.all([
     MediaAsset.find({ status: "review_required" })
       .select("-sha256 -fingerprints -fingerprintBands -stagedPath")
@@ -148,6 +157,7 @@ export const listDuplicateReviews = asyncHandler(async (req, res) => {
       .limit(limit),
     MediaAsset.countDocuments({ status: "review_required" }),
   ]);
+  
   return sendResponse(res, 200, "Duplicate review queue", {
     uploads,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
@@ -160,10 +170,12 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
   if (!["approve", "reject"].includes(req.body.decision)) {
     throw new ApiError(400, "decision must be approve or reject");
   }
+  
   const asset = await MediaAsset.findOne({
     _id: req.params.uploadId,
     status: "review_required",
   }).select("+sha256 +stagedPath");
+  
   if (!asset) throw new ApiError(404, "Pending duplicate review not found");
 
   if (req.body.decision === "reject") {
@@ -176,6 +188,7 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
     asset.duplicateDecision.reviewedBy = req.user._id;
     asset.duplicateDecision.reviewedAt = new Date();
     await asset.save();
+    
     await MediaDuplicateEvent.updateOne(
       { uploadAssetId: asset._id },
       {
@@ -186,6 +199,7 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
         },
       },
     );
+    
     return sendResponse(res, 200, "Upload rejected and temporary media removed", {
       uploadId: asset.id,
       status: asset.status,
@@ -195,10 +209,12 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
   if (asset.expiresAt && asset.expiresAt <= new Date()) {
     throw new ApiError(410, "Staged media expired; ask the creator to upload it again");
   }
+  
   asset.status = "receiving";
   asset.duplicateDecision.reviewedBy = req.user._id;
   asset.duplicateDecision.reviewedAt = new Date();
   await asset.save();
+  
   try {
     await enqueueMediaProcessing(asset._id, { bypassSimilarity: true });
   } catch (error) {
@@ -206,6 +222,7 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
     await asset.save();
     throw new ApiError(503, `Media processing queue unavailable: ${error.message}`);
   }
+  
   await MediaDuplicateEvent.updateOne(
     { uploadAssetId: asset._id },
     {
@@ -216,6 +233,7 @@ export const reviewDuplicate = asyncHandler(async (req, res) => {
       },
     },
   );
+  
   return sendResponse(res, 202, "Upload approved for processing", {
     uploadId: asset.id,
     status: asset.status,
@@ -227,6 +245,7 @@ export const listMyMediaUploads = asyncHandler(async (req, res) => {
     .select("-sha256 -fingerprints -fingerprintBands -stagedPath -pendingCloudinaryPublicId")
     .sort({ createdAt: -1 })
     .limit(50);
+    
   return sendResponse(res, 200, "Your media uploads", { uploads });
 });
 
