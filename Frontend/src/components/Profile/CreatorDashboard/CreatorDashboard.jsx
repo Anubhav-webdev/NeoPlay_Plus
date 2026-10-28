@@ -22,6 +22,8 @@ import {
   createContent,
   getMyCreatorAnalytics,
   getMyCreatorProfile,
+  updateMyCreatorProfile,
+  uploadCreatorProfileImage,
   getMyContent,
   updateContentRecord,
   uploadMedia,
@@ -45,14 +47,16 @@ function CreatorStudio({ creator, user }) {
   // Identity States
   const [channelIdentity, setChannelIdentity] = useState({
     name: creator.displayName,
-    tagline: "",
-    about: "",
+    tagline: creator.tagline || "",
+    about: creator.about || "",
     username: user.username ? `@${user.username}` : "",
     isVerified: true,
     avatar: creator.avatar || "",
-    wallpaper: "",
+    wallpaper: creator.banner || "",
   });
   const [isEditingProfileText, setIsEditingProfileText] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const avatarInputRef = useRef(null);
   const wallpaperInputRef = useRef(null);
 
@@ -159,15 +163,50 @@ function CreatorStudio({ creator, user }) {
     }
   };
 
-  const executeProfileImageUpload = (e, targetProperty) => {
-    const file = e.target.files[0];
-    if (file) {
-      const localUrl = URL.createObjectURL(file);
-      setChannelIdentity(prev => ({ ...prev, [targetProperty]: localUrl }));
-      showToast("Profile media updated", "purple");
+  const executeProfileImageUpload = async (event, targetProperty) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    const imageType = targetProperty === "avatar" ? "avatar" : "banner";
+    setIsUploadingProfileImage(true);
+    showToast("Saving profile image...", "purple");
+    try {
+      const updatedCreator = await uploadCreatorProfileImage(file, imageType);
+      setChannelIdentity((current) => ({
+        ...current,
+        [targetProperty]: (imageType === "banner" ? updatedCreator.banner : updatedCreator.avatar) || "",
+      }));
+      showToast(imageType === "avatar" ? "Profile photo saved." : "Background image saved.", "green");
+    } catch (error) {
+      showToast(error.message || "Could not save the profile image.", "red");
+    } finally {
+      setIsUploadingProfileImage(false);
     }
   };
 
+  const handleSaveCreatorProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const updatedCreator = await updateMyCreatorProfile({
+        displayName: channelIdentity.name.trim(),
+        tagline: channelIdentity.tagline.trim(),
+        about: channelIdentity.about.trim(),
+      });
+      setChannelIdentity((current) => ({
+        ...current,
+        name: updatedCreator.displayName,
+        tagline: updatedCreator.tagline || "",
+        about: updatedCreator.about || "",
+      }));
+      setIsEditingProfileText(false);
+      showToast("Creator profile saved.", "green");
+    } catch (error) {
+      showToast(error.message || "Could not save creator profile.", "red");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
   const handlePublishAsset = async (e) => {
     e.preventDefault();
     if (!formTitle.trim()) return showToast("Content context required!", "red");
@@ -421,6 +460,9 @@ function CreatorStudio({ creator, user }) {
           wallpaperInputRef={wallpaperInputRef}
           avatarInputRef={avatarInputRef}
           executeProfileImageUpload={executeProfileImageUpload}
+          onSaveProfile={handleSaveCreatorProfile}
+          isSavingProfile={isSavingProfile}
+          isUploadingProfileImage={isUploadingProfileImage}
         />
 
         <MetricArchitecture 

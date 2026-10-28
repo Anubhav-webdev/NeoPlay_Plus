@@ -11,7 +11,9 @@
   "main": "Server.js",
   "scripts": {
     "test": "node --test",
-    "dev": "nodemon Server.js",
+    "dev": "node scripts/dev.js",
+    "dev:api": "nodemon Server.js",
+    "start": "node Server.js",
     "worker": "node MediaWorker.js",
     "dev:worker": "nodemon MediaWorker.js",
     "admin:promote": "node scripts/promoteAdmin.js"

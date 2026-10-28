@@ -66,6 +66,7 @@ export default function ProfileHeroHub({
             <GradientBadge color="cyan">Creator</GradientBadge>
           </div>
           <p className="text-purple-400 text-sm">@{channelIdentity.handle}</p>
+          {channelIdentity.tagline && <p className="text-purple-300 text-sm font-semibold">{channelIdentity.tagline}</p>}
           {channelIdentity.bio && (
             <p className="text-slate-300 max-w-2xl text-sm sm:text-base leading-relaxed mx-auto md:mx-0 font-normal">
               {channelIdentity.bio}

@@ -22,6 +22,37 @@ const creatorSchema = new mongoose.Schema(
       default: null,
     },
 
+    avatarPublicId: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    banner: {
+      type: String,
+      default: null,
+    },
+
+    bannerPublicId: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    tagline: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: "",
+    },
+
+    about: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+      default: "",
+    },
+
     applicationStatus: {
       type: String,
       enum: ["pending", "approved", "rejected", "suspended"],

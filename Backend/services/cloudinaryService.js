@@ -20,12 +20,25 @@ function assertConfigured() {
 // Stream upload buffers directly to Cloudinary instead of writing user media to disk.
 export function uploadBuffer(
   buffer,
-  { folder = "neoplay", resourceType = "auto" } = {}
+  {
+    folder = "neoplay",
+    publicId,
+    resourceType = "auto",
+    tags = [],
+  } = {}
 ) {
   assertConfigured();
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: resourceType },
+      {
+        folder,
+        public_id: publicId,
+        resource_type: resourceType,
+        overwrite: false,
+        unique_filename: false,
+        use_filename: false,
+        tags,
+      },
       (error, result) => {
         if (error) return reject(error);
         if (!result)
