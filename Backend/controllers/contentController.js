@@ -117,14 +117,15 @@ export const createContent = asyncHandler(async (req, res) => {
   if (!creator || creator.applicationStatus !== "approved") {
     throw new ApiError(403, "An approved creator account is required");
   }
-  const {
-    type,
-    description,
-    thumbnailUrl,
-    mediaAssetId,
-    categoryIds = [],
-  } = req.body;
+  const { type, mediaAssetId, thumbnailAssetId, categoryIds = [] } = req.body;
+  const description = req.body.description === undefined ? "" : req.body.description;
   const title = req.body.title || (type === "Tweet" ? description : undefined);
+  if (typeof title !== "string" || !title.trim() || title.trim().length > 200) {
+    throw new ApiError(400, "Title must be between 1 and 200 characters");
+  }
+  if (typeof description !== "string" || description.length > 5000) {
+    throw new ApiError(400, "Description must be text with at most 5000 characters");
+  }
   if (!["Tweet", "Video", "Image"].includes(type)) {
     throw new ApiError(400, "type must be Tweet, Video, or Image");
   }
@@ -159,19 +160,39 @@ export const createContent = asyncHandler(async (req, res) => {
   } else if (type !== "Tweet") {
     throw new ApiError(400, "Video and image posts require a verified mediaAssetId");
   }
+  let thumbnail = null;
+  if (thumbnailAssetId) {
+    validateObjectId(thumbnailAssetId, "thumbnailAssetId");
+    thumbnail = await MediaAsset.findOne({
+      _id: thumbnailAssetId,
+      ownerId: req.user._id,
+      creatorId: creator._id,
+      mediaType: "image",
+      status: "ready",
+    });
+    if (!thumbnail) {
+      throw new ApiError(400, "Use a completed, verified image upload for the thumbnail");
+    }
+  }
+  if (type === "Image") thumbnail = media;
+  if (type === "Video" && !thumbnail) {
+    throw new ApiError(400, "Video posts require a verified image thumbnail");
+  }
 
+  const isPublished = req.body.publish === true;
   const content = await Content.create({
     creatorId: creator._id,
     type,
-    title,
-    description,
-    thumbnailUrl,
+    title: title.trim(),
+    description: description.trim(),
+    thumbnailUrl: thumbnail?.secureUrl || null,
+    thumbnailAssetId: thumbnail?._id || null,
     mediaUrl: media?.secureUrl || null,
     mediaPublicId: media?.publicId || null,
     mediaAssetId: media?._id || null,
     categoryIds,
-    status: req.body.publish === true ? "published" : "draft",
-    publishedAt: req.body.publish === true ? new Date() : null,
+    status: isPublished ? "published" : "draft",
+    publishedAt: isPublished ? new Date() : null,
   });
   return sendResponse(res, 201, "Content created", { content });
 });
@@ -192,7 +213,6 @@ export const updateContent = asyncHandler(async (req, res) => {
     "type",
     "title",
     "description",
-    "thumbnailUrl",
     "mediaAssetId",
   ];
   for (const key of allowed) {
@@ -218,6 +238,10 @@ export const updateContent = asyncHandler(async (req, res) => {
     content.mediaUrl = media.secureUrl;
     content.mediaPublicId = media.publicId;
     content.mediaAssetId = media._id;
+    if (content.type === "Image") {
+      content.thumbnailUrl = media.secureUrl;
+      content.thumbnailAssetId = media._id;
+    }
   }
   if (content.mediaAssetId) {
     const media = await MediaAsset.findOne({
@@ -234,6 +258,29 @@ export const updateContent = asyncHandler(async (req, res) => {
     }
     content.mediaUrl = media.secureUrl;
     content.mediaPublicId = media.publicId;
+  }
+  if (req.body.thumbnailAssetId !== undefined) {
+    if (req.body.thumbnailAssetId === null) {
+      if (content.type === "Video" && content.status === "published") {
+        throw new ApiError(400, "Published videos must keep a thumbnail");
+      }
+      content.thumbnailAssetId = null;
+      content.thumbnailUrl = null;
+    } else {
+      validateObjectId(req.body.thumbnailAssetId, "thumbnailAssetId");
+      const thumbnail = await MediaAsset.findOne({
+        _id: req.body.thumbnailAssetId,
+        ownerId: req.user._id,
+        creatorId: content.creatorId,
+        mediaType: "image",
+        status: "ready",
+      });
+      if (!thumbnail) {
+        throw new ApiError(400, "Use a completed, verified image upload for the thumbnail");
+      }
+      content.thumbnailAssetId = thumbnail._id;
+      content.thumbnailUrl = thumbnail.secureUrl;
+    }
   }
   if (req.body.categoryIds !== undefined) {
     if (
@@ -271,6 +318,9 @@ export const publishContent = asyncHandler(async (req, res) => {
       400,
       "Video and image posts require media before publishing"
     );
+  }
+  if (content.type === "Video" && !content.thumbnailUrl) {
+    throw new ApiError(400, "Add a video thumbnail before publishing");
   }
   content.status = "published";
   content.publishedAt = content.publishedAt || new Date();

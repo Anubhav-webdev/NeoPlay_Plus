@@ -34,6 +34,13 @@ const contentSchema = new mongoose.Schema(
       default: null,
     },
 
+    thumbnailAssetId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MediaAsset",
+      default: null,
+      index: true,
+    },
+
     mediaUrl: {
       type: String,
       default: null,

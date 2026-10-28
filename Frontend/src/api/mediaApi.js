@@ -162,6 +162,13 @@ export async function updateContentRecord(contentId, payload) {
   return result.data.content;
 }
 
+export async function publishContentRecord(contentId) {
+  const result = await apiFetch(`/content/${encodeURIComponent(contentId)}/publish`, {
+    method: "POST",
+  });
+  return result.data.content;
+}
+
 export async function archiveContent(contentId) {
   const result = await apiFetch(`/content/${encodeURIComponent(contentId)}`, {
     method: "DELETE",
@@ -172,6 +179,11 @@ export async function archiveContent(contentId) {
 export async function getMyContent({ signal } = {}) {
   const result = await apiFetch("/content/mine", { signal });
   return result.data.items;
+}
+
+export async function getContentCategories({ signal } = {}) {
+  const result = await apiFetch("/categories", { signal });
+  return result.data.categories;
 }
 
 export async function getDuplicateReviewQueue({ signal } = {}) {

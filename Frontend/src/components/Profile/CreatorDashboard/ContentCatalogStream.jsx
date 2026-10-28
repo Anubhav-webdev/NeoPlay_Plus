@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Video, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud } from 'lucide-react';
+import { Search, Video, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud, Send } from 'lucide-react';
 import { FiTwitter } from 'react-icons/fi';
 import {
   IMAGE_UPLOAD_ACCEPT,
@@ -9,6 +9,7 @@ import {
 export default function ContentCatalogStream({
   catalogTab, setCatalogTab, searchQuery, setSearchQuery, filteredCatalog,
   editingItemId, startEditingAsset, handleDeleteAsset, deletingContentId,
+  handlePublishDraft, publishingContentId,
   editFormState, setEditFormState, editFileInputRef, editMediaFile,
   handleEditMediaFileChange, editUploadStatus, isSavingEdit,
   saveEditedAsset, cancelEditingAsset, typeAccent
@@ -44,7 +45,7 @@ export default function ContentCatalogStream({
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex-1 flex gap-4 items-start min-w-0">
                       <div className={`w-20 h-12 bg-slate-950 border ${accent.border} rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden relative shadow-inner`}>
-                        {asset.type === 'video' && (asset.mediaUrl ? <video src={asset.mediaUrl} className="w-full h-full object-cover" /> : <div className={`w-full h-full ${accent.bg} flex items-center justify-center ${accent.text}`}><Video className="w-4 h-4" /></div>)}
+                        {asset.type === 'video' && (asset.thumbnail ? <img src={asset.thumbnail} alt={asset.title + ' thumbnail'} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-500"><Video className="w-4 h-4" /></div>)}
                         {asset.type === 'image' && <img src={asset.mediaUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=60"} alt="Visual" className="w-full h-full object-cover" />}
                         {asset.type === 'tweet' && <div className={`w-full h-full ${accent.bg} flex items-center justify-center ${accent.text}`}><FiTwitter className="w-4 h-4" /></div>}
                         {asset.images && asset.images.length > 1 && <div className="absolute bottom-0 right-0 bg-slate-950/80 px-1 text-[8px] font-bold text-green-400 rounded-tl-md">+{asset.images.length}</div>}
@@ -52,10 +53,13 @@ export default function ContentCatalogStream({
 
                       <div className="min-w-0 flex-1">
                         <h4 className="text-xs font-bold text-slate-200 line-clamp-1">{asset.title}</h4>
+                        {asset.description && <p className="mt-1 line-clamp-1 text-[10px] text-slate-500">{asset.description}</p>}
                         <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-400 font-medium flex-wrap">
                           <span className={`uppercase font-bold tracking-wider text-[9px] px-1.5 py-0.5 rounded ${accent.bg} ${accent.text}`}>{asset.type}</span>
                           <span>•</span><span>{asset.category}</span><span>•</span><span>{asset.views.toLocaleString()} Impr.</span><span>•</span>
-                          {asset.isSubscriberOnly ? (
+                          {asset.status === 'draft' ? (
+                            <span className="text-amber-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Draft</span>
+                          ) : asset.isSubscriberOnly ? (
                             <span className="text-red-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Premium</span>
                           ) : (
                             <span className="text-green-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" /> Public</span>
@@ -66,6 +70,9 @@ export default function ContentCatalogStream({
 
                     {!isEditing && (
                       <div className="flex items-center gap-1.5 self-end sm:self-center">
+                        {asset.status === 'draft' && (
+                          <button onClick={() => handlePublishDraft(asset.id)} disabled={publishingContentId === asset.id} aria-label="Publish draft" title="Publish draft" className="p-2 bg-slate-950 hover:bg-green-950/40 border border-slate-800/80 hover:border-green-500/50 text-slate-400 hover:text-green-300 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
+                        )}
                         <button onClick={() => startEditingAsset(asset)} className="p-2 bg-slate-950 hover:bg-purple-950/40 border border-slate-800/80 hover:border-purple-500/50 text-slate-400 hover:text-purple-300 transition-all rounded-xl active:scale-95 shadow-md"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDeleteAsset(asset.id)} disabled={deletingContentId === asset.id} aria-label="Archive content" className="p-2 bg-slate-950 hover:bg-red-950/40 border border-slate-800/80 hover:border-red-500/50 text-slate-500 hover:text-red-400 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
@@ -84,6 +91,12 @@ export default function ContentCatalogStream({
                         )}
                       </div>
 
+                      {editFormState.type !== 'tweet' && (
+                        <div>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
+                          <textarea value={editFormState.description || ''} maxLength={5000} onChange={(e) => setEditFormState({ ...editFormState, description: e.target.value })} className="mb-3 h-20 w-full resize-y rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none" />
+                        </div>
+                      )}
                       {editFormState.type !== 'tweet' && (
                         <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-900 p-2 text-center hover:border-purple-500/50">
                           <UploadCloud className="mb-0.5 h-4 w-4 text-slate-600" />
