@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, Lock, Globe } from 'lucide-react';
 
 export default function EditPlaylistModal({
@@ -6,8 +5,6 @@ export default function EditPlaylistModal({
   setFullEditPlaylist,
   draftName,
   setDraftName,
-  draftDesc,
-  setDraftDesc,
   draftVisibility,
   setDraftVisibility,
   saveFullEdit
@@ -29,15 +26,6 @@ export default function EditPlaylistModal({
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-400 mb-4"
-        />
-
-        <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1.5">Description</label>
-        <textarea
-          value={draftDesc}
-          onChange={(e) => setDraftDesc(e.target.value)}
-          rows={3}
-          placeholder="What's this playlist for?"
-          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none focus:border-purple-400 mb-4 resize-none"
         />
 
         <label className="block text-xs uppercase tracking-wide text-gray-500 mb-2">Visibility</label>

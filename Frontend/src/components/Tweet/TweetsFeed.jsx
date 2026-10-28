@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   FaFilter as FaFilterIcon,
   FaSortAmountDown as FaSortIcon,
@@ -9,25 +9,61 @@ import {
   FaExternalLinkAlt
 } from "react-icons/fa";
 import TweetCard from "./TweetCard";
-import { initialTweets } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 
 export default function TweetsFeed() {
   const [activeTab, setActiveTab] = useState("forYou");
   const [sortBy, setSortBy] = useState("latest");
   const [showMediaOnly, setShowMediaOnly] = useState(false);
+  const [publishedTweets, setPublishedTweets] = useState([]);
+  const [feedError, setFeedError] = useState("");
   
   // Track user premium verification status
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  const processedTweets = useMemo(() => {
-    return initialTweets
-      .filter((tweet) => {
-        if (activeTab === "trending") return tweet.likes > 100;
-        return true;
+  useEffect(() => {
+    const controller = new AbortController();
+    getPublishedContent("Tweet", { signal: controller.signal })
+      .then((items) => {
+        setPublishedTweets(items.map((item) => {
+          const name = item.creatorId?.displayName || "Creator";
+          return {
+            id: item._id,
+            creatorId: item.creatorId?._id,
+            name,
+            handle: name.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+            avatar: item.creatorId?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=creator",
+            verified: false,
+            time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
+            content: item.description || item.title,
+            likes: 0,
+            retweets: 0,
+            commentCount: item.commentCount || 0,
+            hasPreview: Boolean(item.mediaUrl),
+            mediaUrl: item.mediaUrl || "",
+            mediaType: item.mediaAssetId?.mediaType || "",
+            initialComments: [],
+            isBackendContent: true,
+          };
+        }));
+        setFeedError("");
       })
+      .catch((error) => {
+        if (error.name !== "AbortError") setFeedError(error.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const tweets = useMemo(
+    () => publishedTweets,
+    [publishedTweets],
+  );
+
+  const processedTweets = useMemo(() => {
+    return tweets
       .filter((tweet) => (showMediaOnly ? tweet.hasPreview : true))
       .sort((a, b) => (sortBy === "popular" ? b.likes - a.likes : 0));
-  }, [activeTab, sortBy, showMediaOnly]);
+  }, [sortBy, showMediaOnly, tweets]);
 
   return (
     <div className="min-h-screen w-full bg-transparent text-white flex justify-center selection:bg-blue-500/30">
@@ -138,6 +174,11 @@ export default function TweetsFeed() {
 
           {/* Active Post/Feed Stream */}
           <div className="flex flex-col ">
+            {feedError && (
+              <p role="status" className="m-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+                Could not load creator posts: {feedError}
+              </p>
+            )}
             {processedTweets.length > 0 ? (
               processedTweets.map((tweet) => (
                 <div key={tweet.id} className="transition hover:bg-transparent/10">

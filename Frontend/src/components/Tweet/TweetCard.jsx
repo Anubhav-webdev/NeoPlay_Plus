@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   FaRegComment,
   FaRetweet,
@@ -14,23 +16,92 @@ import {FaQuoteLeft} from "react-icons/fa";
 
 import CommentsCard from "../cards/CommentsCard";
 import ReportCard from "../cards/ReportCard";
+import { getContentLikeStatus, setContentLiked } from "../../api/likesApi";
+import {
+  getCreatorSubscriptionStatus,
+  setCreatorSubscribed,
+} from "../../api/subscriptionsApi";
+import { reportContent } from "../../api/reportsApi";
 
 export default function TweetCard({ tweet }) {
+  const user = useSelector((state) => state.auth.user);
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(
-    tweet.handle === "janedoe"
-  );
+  const [likeCount, setLikeCount] = useState(tweet.likes || 0);
+  const [likeError, setLikeError] = useState("");
+  const [isSavingLike, setIsSavingLike] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followError, setFollowError] = useState("");
+  const [isSavingFollow, setIsSavingFollow] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(tweet.commentCount || 0);
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
-  const toggleLike = () => {
-    setIsLiked((prev) => !prev);
+  useEffect(() => {
+    if (!tweet.isBackendContent) return undefined;
+    const controller = new AbortController();
+    getContentLikeStatus(tweet.id, { signal: controller.signal })
+      .then((status) => {
+        if (!controller.signal.aborted) {
+          setIsLiked(status.liked);
+          setLikeCount(status.likes);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setLikeError(error.message);
+      });
+    return () => controller.abort();
+  }, [tweet.id, tweet.isBackendContent, user]);
+
+  useEffect(() => {
+    if (!tweet.creatorId || !user) return undefined;
+    const controller = new AbortController();
+    getCreatorSubscriptionStatus(tweet.creatorId, { signal: controller.signal })
+      .then((status) => {
+        if (!controller.signal.aborted) setIsFollowing(status.subscribed);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setFollowError(error.message);
+      });
+    return () => controller.abort();
+  }, [tweet.creatorId, user]);
+
+  const toggleLike = async () => {
+    if (!user) {
+      navigate("/signup");
+      return;
+    }
+    setIsSavingLike(true);
+    setLikeError("");
+    try {
+      const result = await setContentLiked(tweet.id, !isLiked);
+      setIsLiked(result.liked);
+      setLikeCount(result.likes);
+    } catch (error) {
+      setLikeError(error.message || "Could not update like.");
+    } finally {
+      setIsSavingLike(false);
+    }
   };
 
-  const toggleFollow = () => {
-    setIsFollowing((prev) => !prev);
-    setShowMenu(false);
+  const toggleFollow = async () => {
+    if (!user) {
+      navigate("/signup");
+      return;
+    }
+    if (!tweet.creatorId) return;
+    setIsSavingFollow(true);
+    setFollowError("");
+    try {
+      const result = await setCreatorSubscribed(tweet.creatorId, !isFollowing);
+      setIsFollowing(result.subscribed);
+      setShowMenu(false);
+    } catch (error) {
+      setFollowError(error.message || "Could not update creator subscription.");
+    } finally {
+      setIsSavingFollow(false);
+    }
   };
 
   return (
@@ -70,6 +141,7 @@ export default function TweetCard({ tweet }) {
 
                 <button
                   onClick={toggleFollow}
+                  disabled={isSavingFollow || !tweet.creatorId}
                   className={`flex items-center space-x-1 px-2 py-0.5 rounded-full border transition ${
                     isFollowing
                       ? "border-slate-700 text-slate-400 hover:border-red-500/50 hover:text-red-400"
@@ -127,7 +199,25 @@ export default function TweetCard({ tweet }) {
         </p>
 
         {/* Preview */}
-        {tweet.hasPreview && (
+        {tweet.mediaUrl ? (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700/50 bg-[#161a29]">
+            {tweet.mediaType === "video" ? (
+              <video
+                controls
+                preload="metadata"
+                src={tweet.mediaUrl}
+                className="max-h-[480px] w-full bg-black object-contain"
+              />
+            ) : (
+              <img
+                src={tweet.mediaUrl}
+                alt=""
+                loading="lazy"
+                className="max-h-[480px] w-full object-contain"
+              />
+            )}
+          </div>
+        ) : tweet.hasPreview && (
           <div className="mt-4 rounded-2xl border border-slate-700/50 bg-[#161a29] overflow-hidden flex flex-col sm:flex-row group cursor-pointer hover:border-purple-500/50 transition">
 
             <div className="h-48 sm:h-28 w-full sm:w-32 flex-shrink-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white">
@@ -160,7 +250,7 @@ export default function TweetCard({ tweet }) {
           >
             <FaRegComment size={18} />
             <span className="text-sm font-medium">
-              {tweet.initialComments?.length || 0}
+              {commentsCount}
             </span>
           </button>
 
@@ -173,6 +263,7 @@ export default function TweetCard({ tweet }) {
 
           <button
             onClick={toggleLike}
+            disabled={isSavingLike || !tweet.isBackendContent}
             title={isLiked ? "Unlike" : "Like"}
             className={`flex items-center space-x-2 transition ${
               isLiked
@@ -187,7 +278,7 @@ export default function TweetCard({ tweet }) {
             )}
 
             <span className="text-sm font-medium">
-              {tweet.likes + (isLiked ? 1 : 0)}
+              {likeCount}
             </span>
           </button>
 
@@ -195,12 +286,13 @@ export default function TweetCard({ tweet }) {
             <FaShareSquare size={18} />
           </button>
         </div>
+        {(likeError || followError) && <p role="alert" className="mt-2 text-xs text-red-300">{likeError || followError}</p>}
 
         {/* Comments */}
         {showComments && (
           <CommentsCard
-            tweetId={tweet.id}
-            initialComments={tweet.initialComments}
+            contentId={tweet.isBackendContent ? tweet.id : undefined}
+            onCountChange={setCommentsCount}
           />
         )}
       </div>
@@ -210,12 +302,15 @@ export default function TweetCard({ tweet }) {
         <ReportCard
           tweet={tweet}
           onClose={() => setShowReport(false)}
-          onSubmit={(reason, details) => {
-            alert(
-              `Report submitted: ${reason}${
-                details ? " - " + details : ""
-              }`
-            );
+          onSubmit={async (reason) => {
+            if (!user) {
+              navigate("/signup");
+              throw new Error("Sign in to report content.");
+            }
+            if (!tweet.isBackendContent) {
+              throw new Error("This post is not available for reporting.");
+            }
+            await reportContent(tweet.id, reason);
             setShowReport(false);
           }}
         />

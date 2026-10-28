@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Image as ImageIcon,
@@ -8,7 +8,7 @@ import {
 import VideoCard from "../Video/Videocard";
 import TweetCard from "../Tweet/TweetCard";
 import ImageCard from "../Image/ImageCard";
-import { VIDEOS, initialTweets, IMAGES } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 import { C, ChannelLabel } from "./HomeConstants";
 
 const tabs = [
@@ -41,6 +41,69 @@ export default function HomeLineup({
   toggleLikeImage,
 }) {
   const [favoriteTab, setFavoriteTab] = useState("videos");
+  const [lineup, setLineup] = useState({ videos: [], pulse: [], gallery: [] });
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      getPublishedContent("Video", { signal: controller.signal }),
+      getPublishedContent("Tweet", { signal: controller.signal }),
+      getPublishedContent("Image", { signal: controller.signal }),
+    ])
+      .then(([videos, tweets, images]) => {
+        if (controller.signal.aborted) return;
+        setLineup({
+          videos: videos.map((item) => ({
+            id: item._id,
+            title: item.title,
+            views: item.viewCount || 0,
+            time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
+            channel: item.creatorId?.displayName || "Creator",
+            avatar: item.creatorId?.avatar || "",
+            thumb: item.thumbnailUrl || item.mediaUrl,
+            src: item.mediaUrl,
+            category: item.categoryIds?.[0]?.name || "General",
+            isBackendContent: true,
+          })),
+          pulse: tweets.map((item) => {
+            const name = item.creatorId?.displayName || "Creator";
+            return {
+              id: item._id,
+              creatorId: item.creatorId?._id,
+              name,
+              handle: name.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+              avatar: item.creatorId?.avatar || "",
+              verified: false,
+              time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
+              content: item.description || item.title,
+              likes: 0,
+              retweets: 0,
+              commentCount: item.commentCount || 0,
+              hasPreview: Boolean(item.mediaUrl),
+              mediaUrl: item.mediaUrl || "",
+              mediaType: item.mediaAssetId?.mediaType || "",
+              isBackendContent: true,
+            };
+          }),
+          gallery: images.map((item) => ({
+            id: item._id,
+            title: item.title,
+            channel: item.creatorId?.displayName || "Creator",
+            thumb: item.mediaUrl,
+            src: item.mediaUrl,
+            category: item.categoryIds?.[0]?.name || "General",
+          })),
+        });
+        setError("");
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) setError(loadError.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const items = lineup[favoriteTab];
 
   return (
     <motion.section
@@ -73,84 +136,52 @@ export default function HomeLineup({
         </div>
       </div>
 
+      {error && <p role="status" className="mb-3 text-xs text-amber-300">Could not load your lineup: {error}</p>}
       <div className="hide-scrollbar flex gap-3 sm:gap-4 overflow-x-auto pb-1 snap-x snap-mandatory">
         <AnimatePresence mode="wait">
-          {favoriteTab === "videos" && (
+          {items.length > 0 ? (
             <motion.div
-              key="videos"
+              key={favoriteTab}
               variants={containerVariants}
               initial="hidden"
               animate="visible"
               exit={{ opacity: 0 }}
               className="flex gap-3 sm:gap-4"
             >
-              {VIDEOS.slice(0, 7).map((video) => (
+              {items.slice(0, 7).map((item) => (
                 <motion.div
-                  key={`fav-${video.id}`}
+                  key={`fav-${item.id}`}
                   variants={itemVariants}
                   className="snap-start shrink-0 w-80 sm:w-80 md:w-96"
                 >
-                  <VideoCard
-                    video={video}
-                    bookmarked={!!bookmarkedVideos[video.id]}
-                    onToggleBookmark={toggleBookmark}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {favoriteTab === "pulse" && (
-            <motion.div
-              key="pulse"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit={{ opacity: 0 }}
-              className="flex gap-4"
-            >
-              {initialTweets.slice(0, 6).map((tweet) => (
-                <motion.div
-                  key={`fav-${tweet.id}`}
-                  variants={itemVariants}
-                  className="snap-start shrink-0 w-80 sm:w-80 md:w-96"
-                >
-                  <TweetCard tweet={tweet} />
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {favoriteTab === "gallery" && (
-            <motion.div
-              key="gallery"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit={{ opacity: 0 }}
-              className="flex gap-4"
-            >
-              {IMAGES.slice(0, 9).map((image) => (
-                <motion.div
-                  key={`fav-${image.id}`}
-                  variants={itemVariants}
-                  className="snap-start shrink-0 w-80 sm:w-80 md:w-96"
-                >
-                  <div className="h-60">
-                    <ImageCard
-                      image={image}
-                      className="w-full h-60"
-                      liked={!!likedImages[image.id]}
-                      onLike={() => toggleLikeImage(image.id)}
+                  {favoriteTab === "videos" && (
+                    <VideoCard
+                      video={item}
+                      bookmarked={!!bookmarkedVideos[item.id]}
+                      onToggleBookmark={toggleBookmark}
                     />
-                  </div>
+                  )}
+                  {favoriteTab === "pulse" && <TweetCard tweet={item} />}
+                  {favoriteTab === "gallery" && (
+                    <div className="h-60">
+                      <ImageCard
+                        image={item}
+                        className="w-full h-60"
+                        liked={!!likedImages[item.id]}
+                        onLike={() => toggleLikeImage(item.id)}
+                      />
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </motion.div>
+          ) : (
+            <p className="py-8 text-sm text-slate-500">
+              {error ? "Your lineup is unavailable until content can be loaded." : "No published content in this section yet."}
+            </p>
           )}
         </AnimatePresence>
       </div>
     </motion.section>
   );
 }
-

@@ -1,24 +1,96 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import VideoCard from '../Video/Videocard';
 import ImageCard from '../Image/ImageCard';
 import TweetCard from '../Tweet/TweetCard';
-import { VIDEOS, IMAGES, initialTweets } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 
 export default function TrendingDashboard() {
   const [activeTab, setActiveTab] = useState('All');
+  const [trendingItems, setTrendingItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [feedError, setFeedError] = useState("");
 
-  const allTrendingItems = [
-    ...(VIDEOS || []).map((item) => ({ ...item, contentType: 'video' })),
-    ...(IMAGES || []).map((item) => ({ ...item, contentType: 'image' })),
-    ...(initialTweets || []).map((item) => ({ ...item, contentType: 'tweet' })),
-  ];
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all(
+      ["Video", "Image", "Tweet"].map((type) =>
+        getPublishedContent(type, { signal: controller.signal }),
+      ),
+    )
+      .then((groups) => {
+        const cards = groups.flatMap((items) =>
+          items.map((item) => {
+            const creator = item.creatorId || {};
+            const common = {
+              id: item._id,
+              creatorId: creator._id,
+              name: creator.displayName || "Creator",
+              channel: creator.displayName || "Creator",
+              handle: (creator.displayName || "creator")
+                .toLowerCase()
+                .replace(/[^a-z0-9_]/g, "_"),
+              avatar: creator.avatar || "",
+              title: item.title,
+              description: item.description,
+              views: item.views || 0,
+              publishedAt: item.publishedAt,
+            };
+            if (item.type === "Video") {
+              return {
+                ...common,
+                contentType: "video",
+                thumb: item.thumbnailUrl || item.mediaUrl,
+                src: item.mediaUrl,
+              };
+            }
+            if (item.type === "Image") {
+              return {
+                ...common,
+                contentType: "image",
+                thumb: item.mediaUrl,
+                src: item.mediaUrl,
+              };
+            }
+            return {
+              ...common,
+              contentType: "tweet",
+              content: item.description || item.title,
+              time: item.publishedAt
+                ? new Date(item.publishedAt).toLocaleDateString()
+                : "",
+              likes: 0,
+              retweets: 0,
+              commentCount: item.commentCount || 0,
+              hasPreview: Boolean(item.mediaUrl),
+              mediaUrl: item.mediaUrl || "",
+              mediaType: item.mediaAssetId?.mediaType || "",
+              initialComments: [],
+              isBackendContent: true,
+            };
+          }),
+        );
+        setTrendingItems(cards);
+        setFeedError("");
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") setFeedError(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
-  const filteredItems = activeTab === 'For You'
-    ? allTrendingItems.filter((item) => item.isFeatured || item.likes || item.trending)
-    : allTrendingItems;
+  const filteredItems = useMemo(
+    () => [...trendingItems].sort((a, b) => {
+      if (activeTab !== "Latest") return 0;
+      return new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0);
+    }),
+    [activeTab, trendingItems],
+  );
 
-  const filterTabs = ['All', 'For You'];
+  const filterTabs = ['All', 'Latest'];
 
   // Categorize for structured grid distribution
   const videos = filteredItems.filter(item => item.contentType === 'video');
@@ -70,7 +142,11 @@ export default function TrendingDashboard() {
 
       {/* 3. Main Asymmetric Dashboard Layout */}
       <main className="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 pt-3">
-        {filteredItems.length > 0 ? (
+        {loading ? (
+          <p className="py-16 text-center text-gray-400">Loading published content...</p>
+        ) : feedError ? (
+          <p role="alert" className="py-16 text-center text-red-300">{feedError}</p>
+        ) : filteredItems.length > 0 ? (
           activeTab === 'All' ? (
             /* Structured 3-Column Editorial Grid for "All" Tab */
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -151,8 +227,8 @@ export default function TrendingDashboard() {
             <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <h3 className="text-lg font-bold text-gray-800">No results found</h3>
-            <p className="text-sm text-gray-500 mt-1">Try tweaking your search term or category tab.</p>
+            <h3 className="text-lg font-bold text-gray-800">No published content yet</h3>
+            <p className="text-sm text-gray-500 mt-1">Videos, images, and posts published by creators will appear here.</p>
           </div>
         )}
       </main>

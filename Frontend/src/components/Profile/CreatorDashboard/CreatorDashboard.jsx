@@ -1,6 +1,9 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { loginSuccess } from '../../../redux/slices/authSlice';
 import "../../../App.css";
 
 import IdentitySuite from '../../Profile/CreatorDashboard/CreatorIdentity';
@@ -9,76 +12,145 @@ import UploadContentForm from '../../Profile/CreatorDashboard/UploadContentForm'
 import ContentCatalogStream from '../../Profile/CreatorDashboard/ContentCatalogStream';
 import DiagnosticMatrix from '../../Profile/CreatorDashboard/DiagnosticMatrix';
 import RegistryModals from '../../Profile/CreatorDashboard/RegistryModals';
+import {
+  addCommentReply,
+  getMyCreatorComments,
+} from '../../../api/commentsApi';
+import {
+  archiveContent,
+  applyAsCreator,
+  createContent,
+  getMyCreatorAnalytics,
+  getMyCreatorProfile,
+  getMyContent,
+  updateContentRecord,
+  uploadMedia,
+  waitForMediaUpload,
+} from '../../../api/mediaApi';
 
-export default function CreatorDashboard() {
+function CreatorStudio({ creator, user }) {
   // Global States
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModal, setActiveModal] = useState(null);
   const [catalogTab, setCatalogTab] = useState('all');
   const [commentTab, setCommentTab] = useState('all');
   const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
   // Edit State Engine
   const [editingItemId, setEditingItemId] = useState(null);
   const [editFormState, setEditFormState] = useState({});
-  const [editMediaMode, setEditMediaMode] = useState('');
   const editFileInputRef = useRef(null);
-  const editThumbInputRef = useRef(null);
 
   // Identity States
   const [channelIdentity, setChannelIdentity] = useState({
-    name: "Apex Cyber Studio",
-    tagline: "High-Fidelity Engineering Pipelines & Next-Gen UI Layouts",
-    about: "Building real-time web matrix graphics modules from scratch.",
-    username: "@apex_cyber_studio",
+    name: creator.displayName,
+    tagline: "",
+    about: "",
+    username: user.username ? `@${user.username}` : "",
     isVerified: true,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ApexStudio",
-    wallpaper: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1600&auto=format&fit=crop&q=80"
+    avatar: creator.avatar || "",
+    wallpaper: "",
   });
   const [isEditingProfileText, setIsEditingProfileText] = useState(false);
   const avatarInputRef = useRef(null);
   const wallpaperInputRef = useRef(null);
 
   // Data Arrays
-  const [followers] = useState([
-    { id: 1, name: "Sarah Dev", handle: "@sarah_codes", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" },
-    { id: 2, name: "Crypto Neo", handle: "@neo_matrix", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Neo" },
-    { id: 3, name: "Alex Code-Ops", handle: "@alex_ops", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" }
-  ]);
-
-  const [following, setFollowing] = useState([
-    { id: 201, name: "Vite Core Studio", handle: "@vite_fast", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Vite" },
-    { id: 202, name: "Lucide Graphics", handle: "@lucide_icons", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Lucide" },
-    { id: 203, name: "Tailwind Engineering", handle: "@tailwind_ui", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tailwind" }
-  ]);
+  const [followers] = useState([]);
+  const [following, setFollowing] = useState([]);
 
   // Form Pipeline Pipeline States
   const [contentType, setContentType] = useState('video');
   const [formTitle, setFormTitle] = useState('');
-  const [formCategory, setFormCategory] = useState('Development');
-  const [formVisibility, setFormVisibility] = useState('public');
-  const [mediaInputMode, setMediaInputMode] = useState('local');
-  const [mediaUrlString, setMediaUrlString] = useState('');
-  const [thumbnailUrlString, setThumbnailUrlString] = useState('');
   const [uploadedFilesArray, setUploadedFilesArray] = useState([]);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [pendingUploadId, setPendingUploadId] = useState(null);
+  const [verifiedMediaAssetId, setVerifiedMediaAssetId] = useState(null);
+  const [editMediaFile, setEditMediaFile] = useState(null);
+  const [editPendingUploadId, setEditPendingUploadId] = useState(null);
+  const [editVerifiedMediaAssetId, setEditVerifiedMediaAssetId] = useState(null);
+  const [editUploadStatus, setEditUploadStatus] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deletingContentId, setDeletingContentId] = useState(null);
 
-  const [contentCatalog, setContentCatalog] = useState([
-    { id: 1, type: "video", title: "Building a Zero-Dependency Web Matrix Engine from Scratch", views: 142000, date: "3 days ago", likes: 8900, commentsCount: 24, category: "Development", isSubscriberOnly: false, mediaUrl: "", thumbnail: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&auto=format&fit=crop&q=60" },
-    { id: 2, type: "image", title: "Next-Gen Spec Layout Sheets", views: 12400, date: "Yesterday", likes: 1950, commentsCount: 8, category: "Design", isSubscriberOnly: true, mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=60", images: ["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=60"] },
-    { id: 3, type: "tweet", title: "Just optimized the backend matrix parsing layer. 60fps frame calculations locked down tightly! drop updates tonight.", views: 8500, date: "2 hours ago", likes: 640, commentsCount: 14, category: "Development", isSubscriberOnly: false, mediaUrl: "" }
-  ]);
-
-  const [comments, setComments] = useState([
-    { id: 501, type: "video", author: "Sarah Dev", handle: "@sarah_codes", text: "Exceptional architecture walkthrough. Can you breakdown the canvas thread model next?", assetTitle: "Zero-Dependency Web Matrix Engine", replyText: "" },
-    { id: 502, type: "tweet", author: "Crypto Neo", handle: "@neo_matrix", text: "Does this optimization path affect running builds over lower tier mobile chipsets?", assetTitle: "Backend matrix parsing layer update", replyText: "" }
-  ]);
+  const [contentCatalog, setContentCatalog] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
 
   // --- ACTIONS ENGINE HANDLERS ---
-  const showToast = (message, tone = 'purple') => {
+  const showToast = useCallback((message, tone = 'purple') => {
     setToast({ message, tone });
-    window.clearTimeout(showToast._t);
-    showToast._t = window.setTimeout(() => setToast(null), 2600);
-  };
+    window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getMyContent({ signal: controller.signal })
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        setContentCatalog(items.map((content) => {
+          const type = content.type.toLowerCase();
+          return {
+            id: content._id,
+            type,
+            title: content.title,
+            views: content.viewCount || 0,
+            likes: 0,
+            commentsCount: 0,
+            date: content.createdAt
+              ? new Date(content.createdAt).toLocaleDateString()
+              : '',
+            category: content.categoryIds?.[0]?.name || '',
+            isSubscriberOnly: false,
+            mediaUrl: content.mediaUrl || '',
+            thumbnail: content.thumbnailUrl || content.mediaUrl || '',
+            images: type === 'image' && content.mediaUrl ? [content.mediaUrl] : [],
+          };
+        }));
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          showToast(error.message || 'Could not load your content.', 'red');
+        }
+      });
+    return () => controller.abort();
+  }, [showToast]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      getMyCreatorAnalytics({ signal: controller.signal }),
+      getMyCreatorComments({ signal: controller.signal }),
+    ])
+      .then(([creatorAnalytics, creatorComments]) => {
+        if (controller.signal.aborted) return;
+        setAnalytics(creatorAnalytics);
+        setComments(creatorComments.map((comment) => {
+          const ownReplies = comment.replies?.filter((reply) =>
+            String(reply.userId?._id || reply.userId) === String(user.id || user._id)
+          ) || [];
+          const author = comment.userId || {};
+          return {
+            id: comment._id,
+            type: comment.contentId?.type?.toLowerCase() || "",
+            author: author.name || author.username || "User",
+            handle: author.username ? `@${author.username}` : "",
+            text: comment.text,
+            assetTitle: comment.contentId?.title || "Published content",
+            replyText: ownReplies.at(-1)?.text || "",
+          };
+        }));
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          showToast(error.message || "Could not load creator analytics and comments.", "red");
+        }
+      });
+    return () => controller.abort();
+  }, [showToast, user]);
 
   const handleUnfollowTarget = (id) => {
     if (window.confirm("Remove this connection?")) {
@@ -96,87 +168,198 @@ export default function CreatorDashboard() {
     }
   };
 
-  const handleMultiFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 0) {
-      const mappedUrls = files.map(file => URL.createObjectURL(file));
-      setUploadedFilesArray(prev => [...prev, ...mappedUrls]);
+  const handlePublishAsset = async (e) => {
+    e.preventDefault();
+    if (!formTitle.trim()) return showToast("Content context required!", "red");
+    if (contentType !== 'tweet' && !(uploadedFilesArray[0] instanceof File)) {
+      return showToast("Select a local image or video file first.", "red");
+    }
+
+    setIsPublishing(true);
+    setUploadStatus('Preparing upload');
+    try {
+      let mediaAssetId = verifiedMediaAssetId;
+      if (!mediaAssetId && uploadedFilesArray[0] instanceof File) {
+        let uploadId = pendingUploadId;
+        if (!uploadId) {
+          const queuedUpload = await uploadMedia(uploadedFilesArray[0]);
+          uploadId = queuedUpload.uploadId;
+          setPendingUploadId(uploadId);
+        }
+        setUploadStatus('Checking for exact and similar media');
+        const verifiedUpload = await waitForMediaUpload(uploadId, setUploadStatus);
+        if (verifiedUpload.reviewPending) {
+          throw new Error("Possible duplicate: this upload is waiting for moderator review.");
+        }
+        mediaAssetId = verifiedUpload._id;
+        setVerifiedMediaAssetId(mediaAssetId);
+        setPendingUploadId(null);
+      }
+
+      const type = contentType === 'tweet'
+        ? 'Tweet'
+        : contentType === 'video'
+          ? 'Video'
+          : 'Image';
+      setUploadStatus('Publishing verified content');
+      const content = await createContent({
+        type,
+        title: contentType === 'tweet' ? formTitle.trim().slice(0, 200) : formTitle.trim(),
+        description: contentType === 'tweet' ? formTitle.trim() : '',
+        mediaAssetId,
+        publish: true,
+      });
+      const newAsset = {
+        id: content._id,
+        type: contentType,
+        title: content.title,
+        views: content.viewCount || 0,
+        likes: 0,
+        commentsCount: 0,
+        date: "Just now",
+        category: '',
+        isSubscriberOnly: false,
+        mediaUrl: content.mediaUrl || '',
+        thumbnail: content.thumbnailUrl || content.mediaUrl || '',
+        images: contentType === 'image' ? [content.mediaUrl] : [],
+      };
+
+      setContentCatalog((items) => [newAsset, ...items.filter((item) => item.id !== newAsset.id)]);
+      setFormTitle('');
+      setUploadedFilesArray([]);
+      setVerifiedMediaAssetId(null);
+      setPendingUploadId(null);
+      setUploadStatus('');
+      showToast("Verified content published.", "green");
+    } catch (error) {
+      if (["duplicate", "failed"].includes(error.uploadStatus)) {
+        setPendingUploadId(null);
+        setVerifiedMediaAssetId(null);
+      }
+      setUploadStatus('');
+      showToast(error.message || "Content upload failed.", "red");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
-  const handlePublishAsset = (e) => {
-    e.preventDefault();
-    if (!formTitle.trim()) return showToast("Content context required!", "red");
-
-    const payloadMedia = mediaInputMode === 'url' ? mediaUrlString : (uploadedFilesArray[0] || "");
-    const newAsset = {
-      id: Date.now(),
-      type: contentType,
-      title: formTitle,
-      views: 0, likes: 0, commentsCount: 0, date: "Just now",
-      category: formCategory,
-      isSubscriberOnly: formVisibility === 'premium',
-      mediaUrl: payloadMedia,
-      thumbnail: thumbnailUrlString || "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&auto=format&fit=crop&q=60",
-      images: contentType === 'image' ? uploadedFilesArray : []
-    };
-
-    setContentCatalog([newAsset, ...contentCatalog]);
-    setFormTitle('');
-    setMediaUrlString('');
-    setThumbnailUrlString('');
-    setUploadedFilesArray([]);
-    showToast("Asset published to the matrix", "green");
+  const resetMediaUploadState = () => {
+    setVerifiedMediaAssetId(null);
+    setPendingUploadId(null);
   };
 
-  const handleDeleteAsset = (id) => {
-    if (window.confirm("Permanently strip this asset from registry vectors?")) {
-      setContentCatalog(contentCatalog.filter(item => item.id !== id));
-      showToast("Asset deleted", "red");
+  const handleDeleteAsset = async (id) => {
+    if (!window.confirm("Archive this content? It will no longer be publicly listed.")) return;
+    setDeletingContentId(id);
+    try {
+      await archiveContent(id);
+      setContentCatalog((items) => items.filter((item) => item.id !== id));
+      showToast("Content archived.", "green");
+    } catch (error) {
+      showToast(error.message || "Could not archive content.", "red");
+    } finally {
+      setDeletingContentId(null);
     }
   };
 
   const startEditingAsset = (asset) => {
     setEditingItemId(asset.id);
     setEditFormState({ ...asset });
-    setEditMediaMode('url');
+    setEditMediaFile(null);
+    setEditPendingUploadId(null);
+    setEditVerifiedMediaAssetId(null);
+    setEditUploadStatus('');
   };
 
   const cancelEditingAsset = () => {
     setEditingItemId(null);
     setEditFormState({});
+    setEditMediaFile(null);
+    setEditPendingUploadId(null);
+    setEditVerifiedMediaAssetId(null);
+    setEditUploadStatus('');
   };
 
-  const saveEditedAsset = () => {
-    setContentCatalog(contentCatalog.map(item => item.id === editingItemId ? editFormState : item));
-    setEditingItemId(null);
-    showToast("Asset updated", "green");
+  const saveEditedAsset = async () => {
+    if (!editFormState.title?.trim()) {
+      showToast("Content title or post text is required.", "red");
+      return;
+    }
+    setIsSavingEdit(true);
+    setEditUploadStatus(editMediaFile ? "Preparing replacement media" : "Saving changes");
+    try {
+      let mediaAssetId = editVerifiedMediaAssetId;
+      if (editMediaFile && !mediaAssetId) {
+        let uploadId = editPendingUploadId;
+        if (!uploadId) {
+          const queuedUpload = await uploadMedia(editMediaFile);
+          uploadId = queuedUpload.uploadId;
+          setEditPendingUploadId(uploadId);
+        }
+        setEditUploadStatus("Verifying replacement media");
+        const verifiedUpload = await waitForMediaUpload(uploadId, setEditUploadStatus);
+        if (verifiedUpload.reviewPending) {
+          setEditUploadStatus("Possible duplicate: waiting for moderator review. Save again after review.");
+          throw new Error("Possible duplicate: replacement media is waiting for moderator review.");
+        }
+        mediaAssetId = verifiedUpload._id;
+        setEditVerifiedMediaAssetId(mediaAssetId);
+        setEditPendingUploadId(null);
+      }
+
+      const payload = {
+        title: editFormState.title.trim(),
+        ...(editFormState.type === 'tweet'
+          ? { description: editFormState.title.trim() }
+          : {}),
+        ...(mediaAssetId ? { mediaAssetId } : {}),
+      };
+      const updated = await updateContentRecord(editingItemId, payload);
+      setContentCatalog((items) => items.map((item) => item.id === editingItemId
+        ? {
+          ...item,
+          title: updated.title,
+          mediaUrl: updated.mediaUrl || '',
+          thumbnail: updated.thumbnailUrl || updated.mediaUrl || '',
+          images: item.type === 'image' && updated.mediaUrl ? [updated.mediaUrl] : [],
+        }
+        : item));
+      cancelEditingAsset();
+      showToast("Content updated.", "green");
+    } catch (error) {
+      if (["duplicate", "failed"].includes(error.uploadStatus)) {
+        setEditPendingUploadId(null);
+        setEditVerifiedMediaAssetId(null);
+      }
+      if (!error.uploadStatus && !error.message?.includes("waiting for moderator review")) {
+        setEditUploadStatus(error.message || "Could not save changes.");
+      }
+      showToast(error.message || "Could not save changes.", "red");
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   const handleEditMediaFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const localUrl = URL.createObjectURL(file);
-      setEditFormState(prev => ({
-        ...prev,
-        mediaUrl: localUrl,
-        ...(prev.type === 'image' ? { images: [...(prev.images || []), localUrl] } : {})
-      }));
-    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditMediaFile(file);
+    setEditPendingUploadId(null);
+    setEditVerifiedMediaAssetId(null);
+    setEditUploadStatus('');
   };
 
-  const handleEditThumbFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const localUrl = URL.createObjectURL(file);
-      setEditFormState(prev => ({ ...prev, thumbnail: localUrl }));
-    }
-  };
-
-  const submitReplyToComment = (commentId, replyString) => {
+  const submitReplyToComment = async (commentId, replyString) => {
     if (!replyString.trim()) return;
-    showToast("Reply committed to thread", "blue");
-    setComments(comments.map(c => c.id === commentId ? { ...c, replyText: replyString } : c));
+    try {
+      const reply = await addCommentReply(commentId, replyString.trim());
+      setComments((current) => current.map((comment) => (
+        comment.id === commentId ? { ...comment, replyText: reply.text } : comment
+      )));
+      showToast("Reply posted.", "blue");
+    } catch (error) {
+      showToast(error.message || "Could not post reply.", "red");
+    }
   };
 
   // Filters Engine Mappings
@@ -241,8 +424,7 @@ export default function CreatorDashboard() {
         />
 
         <MetricArchitecture 
-          followingCount={following.length}
-          setActiveModal={setActiveModal}
+          analytics={analytics}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -250,13 +432,10 @@ export default function CreatorDashboard() {
             <UploadContentForm 
               contentType={contentType} setContentType={setContentType}
               formTitle={formTitle} setFormTitle={setFormTitle}
-              formCategory={formCategory} setFormCategory={setFormCategory}
-              formVisibility={formVisibility} setFormVisibility={setFormVisibility}
-              mediaInputMode={mediaInputMode} setMediaInputMode={setMediaInputMode}
-              mediaUrlString={mediaUrlString} setMediaUrlString={setMediaUrlString}
-              thumbnailUrlString={thumbnailUrlString} setThumbnailUrlString={setThumbnailUrlString}
               uploadedFilesArray={uploadedFilesArray} setUploadedFilesArray={setUploadedFilesArray}
-              handleMultiFileChange={handleMultiFileChange} handlePublishAsset={handlePublishAsset}
+              resetMediaUploadState={resetMediaUploadState}
+              handlePublishAsset={handlePublishAsset}
+              isPublishing={isPublishing} uploadStatus={uploadStatus}
             />
           </div>
 
@@ -266,10 +445,13 @@ export default function CreatorDashboard() {
               searchQuery={searchQuery} setSearchQuery={setSearchQuery}
               filteredCatalog={filteredCatalog} editingItemId={editingItemId}
               startEditingAsset={startEditingAsset} handleDeleteAsset={handleDeleteAsset}
+              deletingContentId={deletingContentId}
               editFormState={editFormState} setEditFormState={setEditFormState}
-              editMediaMode={editMediaMode} setEditMediaMode={setEditMediaMode}
-              editFileInputRef={editFileInputRef} editThumbInputRef={editThumbInputRef}
-              handleEditMediaFileChange={handleEditMediaFileChange} handleEditThumbFileChange={handleEditThumbFileChange}
+              editFileInputRef={editFileInputRef}
+              editMediaFile={editMediaFile}
+              handleEditMediaFileChange={handleEditMediaFileChange}
+              editUploadStatus={editUploadStatus}
+              isSavingEdit={isSavingEdit}
               saveEditedAsset={saveEditedAsset} cancelEditingAsset={cancelEditingAsset}
               typeAccent={typeAccent}
             />
@@ -289,5 +471,112 @@ export default function CreatorDashboard() {
         handleUnfollowTarget={handleUnfollowTarget}
       />
     </div>
+  );
+}
+
+export default function CreatorDashboard() {
+  const dispatch = useDispatch();
+  const { user, initialized } = useSelector((state) => state.auth);
+  const [creator, setCreator] = useState(null);
+  const [displayName, setDisplayName] = useState(user?.name || user?.username || '');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const controller = new AbortController();
+    getMyCreatorProfile({ signal: controller.signal })
+      .then((profile) => {
+        if (controller.signal.aborted) return;
+        setCreator(profile);
+        setError('');
+        if (profile?.applicationStatus === 'approved' && user.role !== 'creator') {
+          const updatedUser = { ...user, role: 'creator' };
+          localStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
+          dispatch(loginSuccess(updatedUser));
+        }
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) setError(loadError.message || 'Could not load creator status.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [dispatch, refreshKey, user]);
+
+  if (!initialized) {
+    return <main className="mx-auto max-w-3xl p-8 text-center text-slate-300">Checking your account...</main>;
+  }
+  if (!user) return <Navigate to="/signup" replace />;
+  if (loading) {
+    return <main className="mx-auto max-w-3xl p-8 text-center text-slate-300">Loading creator account...</main>;
+  }
+  if (creator?.applicationStatus === 'approved') return <CreatorStudio creator={creator} user={user} />;
+
+  const handleApplication = async (event) => {
+    event.preventDefault();
+    if (displayName.trim().length < 2) {
+      setError('Channel name must be at least 2 characters.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const application = await applyAsCreator(displayName.trim());
+      setCreator(application);
+    } catch (submitError) {
+      setError(submitError.message || 'Could not submit your creator application.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 py-12 text-white">
+      <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-6 sm:p-8">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Creator setup</p>
+        <h1 className="mt-2 text-2xl font-bold">Create your creator channel</h1>
+        {creator?.applicationStatus === 'pending' ? (
+          <div className="mt-5 space-y-4">
+            <p className="text-sm text-slate-300">
+              Your application for <strong>{creator.displayName}</strong> is waiting for admin approval. Uploading and publishing will be available after approval.
+            </p>
+            <button type="button" onClick={() => { setLoading(true); setRefreshKey((key) => key + 1); }} className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold hover:bg-cyan-500">
+              Check application status
+            </button>
+          </div>
+        ) : creator?.applicationStatus === 'suspended' ? (
+          <p className="mt-5 text-sm text-amber-200">This creator account is suspended. Contact support for assistance.</p>
+        ) : (
+          <form onSubmit={handleApplication} className="mt-5 space-y-4">
+            {creator?.applicationStatus === 'rejected' && (
+              <p className="text-sm text-amber-200">Your previous application was declined. Update your channel name to apply again.</p>
+            )}
+            <label className="block text-sm font-medium text-slate-300" htmlFor="creator-display-name">
+              Channel name
+            </label>
+            <input
+              id="creator-display-name"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              maxLength={100}
+              minLength={2}
+              required
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-400"
+              placeholder="Enter your creator channel name"
+            />
+            <p className="text-xs text-slate-400">Your application is reviewed before creator uploads are enabled.</p>
+            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+            <button type="submit" disabled={submitting} className="rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold hover:bg-cyan-500 disabled:cursor-wait disabled:opacity-60">
+              {submitting ? 'Submitting...' : creator ? 'Apply again' : 'Create creator channel'}
+            </button>
+          </form>
+        )}
+        {error && creator?.applicationStatus && <p role="alert" className="mt-4 text-sm text-red-300">{error}</p>}
+      </section>
+    </main>
   );
 }

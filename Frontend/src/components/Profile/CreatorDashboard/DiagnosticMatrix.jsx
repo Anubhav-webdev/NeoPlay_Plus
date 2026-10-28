@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, MessageSquare, CornerDownRight } from 'lucide-react';
 
@@ -15,15 +14,15 @@ export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredCo
             <div className="space-y-4">
               <div className="p-3 bg-slate-950/60 rounded-xl border-l-4 border-purple-500 hover:bg-slate-900/50 transition-colors">
                 <span className="text-[9px] font-bold uppercase text-purple-400 block tracking-widest mb-1">Trending Parameter</span>
-                <p className="text-xs text-slate-400 leading-relaxed">"Zero-Dependency Canvas Engine" architectures are breaking volume vectors by +40% across active nodes.</p>
+                <p className="text-xs text-slate-400 leading-relaxed">Publish verified videos, images, or posts to start building channel activity.</p>
               </div>
               <div className="p-3 bg-slate-950/60 rounded-xl border-l-4 border-blue-500 hover:bg-slate-900/50 transition-colors">
                 <span className="text-[9px] font-bold uppercase text-blue-400 block tracking-widest mb-1">Velocity Metric Advice</span>
-                <p className="text-xs text-slate-400 leading-relaxed">Walkthrough content nodes tagged under "Development" are pulling 3x higher retention spikes than visual previews.</p>
+                <p className="text-xs text-slate-400 leading-relaxed">Your published content and view counts appear here as your channel grows.</p>
               </div>
               <div className="p-3 bg-slate-950/60 rounded-xl border-l-4 border-red-500 hover:bg-slate-900/50 transition-colors">
                 <span className="text-[9px] font-bold uppercase text-red-400 block tracking-widest mb-1">Engagement Trigger</span>
-                <p className="text-xs text-slate-400 leading-relaxed">Your latest Matrix shader engine post has achieved peak comment-to-view ratios over the last 24 hours.</p>
+                <p className="text-xs text-slate-400 leading-relaxed">New comments on your published content will appear in the reply queue.</p>
               </div>
             </div>
           </div>
@@ -38,7 +37,7 @@ export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredCo
               <MessageSquare className="w-5 h-5 text-blue-400" />Comments Reply
             </h3>
             <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-              {['all', 'video', 'tweet'].map(tab => (
+              {['all', 'video', 'image', 'tweet'].map(tab => (
                 <button key={tab} onClick={() => setCommentTab(tab)} className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-colors ${commentTab === tab ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>
                   {tab === 'tweet' ? 'Tweets' : tab}
                 </button>
@@ -47,7 +46,9 @@ export default function DiagnosticMatrix({ commentTab, setCommentTab, filteredCo
           </div>
 
           <div className="divide-y divide-slate-800/60 max-h-[320px] overflow-y-auto flex-1 bg-slate-950/10">
-            {filteredComments.map(comment => (
+            {filteredComments.length === 0 ? (
+              <p className="p-6 text-sm text-slate-500">No comments on your published content yet.</p>
+            ) : filteredComments.map(comment => (
               <div key={comment.id} className="p-4 space-y-3">
                 <div className="flex justify-between items-start flex-wrap gap-3">
                   <div className="flex gap-3">

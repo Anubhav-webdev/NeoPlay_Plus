@@ -1,8 +1,10 @@
-﻿import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { Header } from "../common/Navbar";
 import { Sidebar } from "../common/Sidebar";
 import { MobileBottomNav } from "../common/MobileBottomNav";
+import { restoreUser } from "../../redux/slices/authSlice";
 
 /* Redux imports for uiSlice */
 import {
@@ -20,6 +22,17 @@ function Layout() {
   const { sidebarExpanded, mobileSidebarOpen, searchOpen } = useSelector(
     (state) => state.ui
   );
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("loggedInUser");
+    if (!storedUser) return;
+    try {
+      dispatch(restoreUser(JSON.parse(storedUser)));
+    } catch (error) {
+      console.error("Could not restore the signed-in account", error);
+      localStorage.removeItem("loggedInUser");
+    }
+  }, [dispatch]);
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-[#F8FAFC] font-orbitron">

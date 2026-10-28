@@ -47,7 +47,7 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
       {/* Section Header */}
       <div className="flex items-center justify-between mb-1 px-1">
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400/80">
-          Related Videos ....
+          Related content
         </h3>
       </div>
 
@@ -148,6 +148,9 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
             </Link>
           </motion.div>
         ))}
+        {relatedVideos.length === 0 && (
+          <p className="px-1 text-xs text-zinc-500">No other published videos yet.</p>
+        )}
       </motion.div>
     </aside>
   );

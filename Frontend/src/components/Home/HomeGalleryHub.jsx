@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import ImageCard from "../Image/ImageCard";
-import { IMAGES } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 import {
   C,
   useHScroll,
@@ -10,6 +11,29 @@ import {
 
 export default function HomeGalleryHub({ likedImages, toggleLikeImage }) {
   const [thumbRef, scrollThumb] = useHScroll();
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPublishedContent("Image", { signal: controller.signal })
+      .then((items) => {
+        setImages(items.map((item) => ({
+          id: item._id,
+          title: item.title,
+          channel: item.creatorId?.displayName || "Creator",
+          thumb: item.mediaUrl,
+          src: item.mediaUrl,
+          category: item.categoryIds?.[0]?.name || "General",
+          isBackendContent: true,
+        })));
+        setError("");
+      })
+      .catch((loadError) => {
+        if (loadError.name !== "AbortError") setError(loadError.message);
+      });
+    return () => controller.abort();
+  }, []);
 
   return (
     <motion.section
@@ -28,6 +52,7 @@ export default function HomeGalleryHub({ likedImages, toggleLikeImage }) {
         />
       </div>
 
+      {error && <p role="status" className="mb-3 text-xs text-amber-300">Could not load images: {error}</p>}
       <div
         className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2 mb-2 "
         style={{ gridAutoRows: "120px" }}
@@ -35,7 +60,7 @@ export default function HomeGalleryHub({ likedImages, toggleLikeImage }) {
         <div
           ref={thumbRef}
           className="hide-scrollbar gap-4 flex overflow-x-auto  col-span-4 row-span-2 pb-20">
-          {IMAGES.slice(1).map((image) => (
+          {images.map((image) => (
             <motion.div
               key={image.id}
               className="shrink-0 w-96 sm:w-96 md:w-96"
@@ -50,28 +75,19 @@ export default function HomeGalleryHub({ likedImages, toggleLikeImage }) {
           ))}
         </div>
         
-        <ImageCard
-          image={IMAGES[1]}
-          className="col-span-1 sm:col-span-2"
-          liked={!!likedImages[IMAGES[1].id]}
-          onLike={() => toggleLikeImage(IMAGES[1].id)}
-        />
-        <ImageCard
-          image={IMAGES[2]}
-          className="col-span-1 "
-          liked={!!likedImages[IMAGES[2].id]}
-          onLike={() => toggleLikeImage(IMAGES[2].id)}
-        />
-        <ImageCard
-          image={IMAGES[3]}
-          className="col-span-1"
-          liked={!!likedImages[IMAGES[3].id]}
-          onLike={() => toggleLikeImage(IMAGES[3].id)}
-        />
+        {images.slice(0, 3).map((image) => (
+          <ImageCard
+            key={`featured-${image.id}`}
+            image={image}
+            className="col-span-1"
+            liked={!!likedImages[image.id]}
+            onLike={() => toggleLikeImage(image.id)}
+          />
+        ))}
       </div>
 
       <div className="hide-scrollbar flex gap-3 overflow-x-auto pb-8 pt-20">
-        {IMAGES.slice(4).map((image, idx) => (
+        {images.slice(3).map((image, idx) => (
           <motion.div
             key={image.id}
             initial={{ opacity: 0, x: 10 }}
@@ -89,7 +105,9 @@ export default function HomeGalleryHub({ likedImages, toggleLikeImage }) {
           </motion.div>
         ))}
       </div>
+      {images.length === 0 && (
+        <p className="py-8 text-sm text-zinc-500">{error ? "Images are unavailable until the feed can be loaded." : "No published images yet."}</p>
+      )}
     </motion.section>
   );
 }
-

@@ -1,33 +1,52 @@
 import { useState, useEffect } from "react";
 import ImageCard from "./ImageCard";
-import { IMAGES } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 
 export default function ImageGrid() {
-  // Take the first 5 images for the animated creator slider
-  const sliderImages = IMAGES.slice(0, 5);
-  // Take the next two images to fill the top right layout slots
-  const topRightImages = IMAGES.slice(5, 7);
-  // The rest go into the staggered latest grid below
-  const remainingImages = IMAGES.slice(7);
-
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [publishedImages, setPublishedImages] = useState([]);
+  const [feedError, setFeedError] = useState("");
+
+  const categories = ["All", ...Array.from(new Set(publishedImages.map((img) => img.category || "General")))];
+  const filteredImages = publishedImages.filter((image) => (
+    selectedCategory === "All" || image.category === selectedCategory
+  ));
+  const sliderImages = filteredImages.slice(0, 5);
+  const topRightImages = filteredImages.slice(5, 7);
+  const remainingImages = filteredImages.slice(7);
+  const activeSlideIndex = sliderImages.length ? activeIndex % sliderImages.length : 0;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPublishedContent("Image", { signal: controller.signal })
+      .then((items) => {
+        setPublishedImages(items.map((item) => ({
+          id: item._id,
+          title: item.title,
+          channel: item.creatorId?.displayName || "Creator",
+          thumb: item.mediaUrl,
+          src: item.mediaUrl,
+          category: item.categoryIds?.[0]?.name || "General",
+          isBackendContent: true,
+        })));
+        setFeedError("");
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") setFeedError(error.message);
+      });
+    return () => controller.abort();
+  }, []);
 
   // Auto-play slider
   useEffect(() => {
+    if (sliderImages.length < 2) return undefined;
     const interval = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % sliderImages.length);
     }, 5000);
     return () => clearInterval(interval);
   }, [sliderImages.length]);
-
-  const categories = ["All", ...Array.from(new Set(IMAGES.map((img) => img.category || "General")))];
-
-  const filteredRemaining = remainingImages.filter((image) => {
-    if (selectedCategory === "All") return true;
-    return image.category === selectedCategory;
-  });
 
   return (
     <section className="w-full pb-20 p-4 md:p-6 bg-transparent text-slate-900 dark:text-white">
@@ -42,7 +61,13 @@ export default function ImageGrid() {
     </span>
   </h2>
 </div>
-        
+
+{feedError && (
+  <p role="status" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+    Could not load creator images: {feedError}
+  </p>
+)}
+
         {/* TOP RIGHT FILTER BUTTON */}
         <div className="relative z-30">
           <button
@@ -76,11 +101,16 @@ export default function ImageGrid() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         
         {/* LEFT SIDE: CREATOR GALLERY SLIDER (Spans 2 columns on large screens) */}
-        <div className="lg:col-span-2 relative h-[300px] md:h-[380px] rounded-3xl overflow-hidden shadow-md bg-slate-950 group">
+        <div className={`lg:col-span-2 relative h-[300px] md:h-[380px] rounded-3xl overflow-hidden shadow-md bg-slate-950 group ${sliderImages.length ? "" : "flex items-center justify-center"}`}>
+          {sliderImages.length === 0 && (
+            <p className="px-6 text-center text-sm text-slate-400">
+              {feedError ? "Images are unavailable until the feed can be loaded." : "No published images yet."}
+            </p>
+          )}
           {sliderImages.map((image, idx) => (
             <div
               key={`slide-${image.id}`}
-              className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-in-out ${idx === activeIndex ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-105 pointer-events-none"}`}
+              className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-in-out ${idx === activeSlideIndex ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-105 pointer-events-none"}`}
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 z-10" />
               <img src={image.src || image.url} alt={image.title} className="w-full h-full object-cover" />
@@ -98,7 +128,7 @@ export default function ImageGrid() {
               <button
                 key={idx}
                 onClick={() => setActiveIndex(idx)}
-                className={`h-2 rounded-full transition-all duration-300 ${idx === activeIndex ? "w-6 bg-white" : "w-2 bg-white/40"}`}
+                className={`h-2 rounded-full transition-all duration-300 ${idx === activeSlideIndex ? "w-6 bg-white" : "w-2 bg-white/40"}`}
               />
             ))}
           </div>
@@ -116,15 +146,17 @@ export default function ImageGrid() {
 
       {/* BOTTOM SECTION: LATEST REMAINING GRID (Asymmetric Masonry Layout) */}
       <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6 [column-fill:_balance] w-full">
-        {filteredRemaining.length > 0 ? (
-          filteredRemaining.map((image) => (
+        {remainingImages.length > 0 ? (
+          remainingImages.map((image) => (
             <div key={image.id} className="break-inside-avoid inline-block w-full">
               <ImageCard image={image} />
             </div>
           ))
         ) : (
           <div className="col-span-full py-20 text-center text-sm text-slate-400">
-            No submissions match your filter settings.
+            {filteredImages.length === 0
+              ? (feedError ? "Images are unavailable until the feed can be loaded." : "No published images match this filter.")
+              : "No more images to show."}
           </div>
         )}
       </div>

@@ -1,13 +1,13 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Video, Image as ImageIcon, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud } from 'lucide-react';
+import { Search, Video, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud } from 'lucide-react';
 import { FiTwitter } from 'react-icons/fi';
 
 export default function ContentCatalogStream({
   catalogTab, setCatalogTab, searchQuery, setSearchQuery, filteredCatalog,
-  editingItemId, startEditingAsset, handleDeleteAsset, editFormState, setEditFormState,
-  editMediaMode, setEditMediaMode, editFileInputRef, editThumbInputRef,
-  handleEditMediaFileChange, handleEditThumbFileChange, saveEditedAsset, cancelEditingAsset, typeAccent
+  editingItemId, startEditingAsset, handleDeleteAsset, deletingContentId,
+  editFormState, setEditFormState, editFileInputRef, editMediaFile,
+  handleEditMediaFileChange, editUploadStatus, isSavingEdit,
+  saveEditedAsset, cancelEditingAsset, typeAccent
 }) {
   return (
     <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-[24px] shadow-2xl overflow-hidden">
@@ -63,7 +63,7 @@ export default function ContentCatalogStream({
                     {!isEditing && (
                       <div className="flex items-center gap-1.5 self-end sm:self-center">
                         <button onClick={() => startEditingAsset(asset)} className="p-2 bg-slate-950 hover:bg-purple-950/40 border border-slate-800/80 hover:border-purple-500/50 text-slate-400 hover:text-purple-300 transition-all rounded-xl active:scale-95 shadow-md"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 bg-slate-950 hover:bg-red-950/40 border border-slate-800/80 hover:border-red-500/50 text-slate-500 hover:text-red-400 transition-all rounded-xl active:scale-95 shadow-md"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDeleteAsset(asset.id)} disabled={deletingContentId === asset.id} aria-label="Archive content" className="p-2 bg-slate-950 hover:bg-red-950/40 border border-slate-800/80 hover:border-red-500/50 text-slate-500 hover:text-red-400 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     )}
                   </div>
@@ -80,57 +80,30 @@ export default function ContentCatalogStream({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">Category</label>
-                          <select value={editFormState.category || 'Development'} onChange={(e) => setEditFormState({ ...editFormState, category: e.target.value })} className="w-full bg-slate-900 border border-slate-800 text-xs p-2.5 rounded-lg text-slate-300 focus:outline-none appearance-none">
-                            <option value="Development">Development</option>
-                            <option value="Development">Cartoon</option>
-                            <option value="Design">Design</option><option value="Hardware">Hardware</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">Visibility</label>
-                          <select value={editFormState.isSubscriberOnly ? 'premium' : 'public'} onChange={(e) => setEditFormState({ ...editFormState, isSubscriberOnly: e.target.value === 'premium' })} className="w-full bg-slate-900 border border-slate-800 text-xs p-2.5 rounded-lg text-slate-300 focus:outline-none appearance-none">
-                            <option value="public">Normal View</option><option value="premium">Subscriber Only</option>
-                          </select>
-                        </div>
-                      </div>
-
                       {editFormState.type !== 'tweet' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{editFormState.type === 'video' ? 'Replace Video' : 'Add Image Node'}</label>
-                            <div className="flex gap-1.5 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
-                              <button type="button" onClick={() => setEditMediaMode('local')} className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${editMediaMode === 'local' ? 'bg-purple-600 text-white' : 'text-slate-500'}`}>Local</button>
-                              <button type="button" onClick={() => setEditMediaMode('url')} className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${editMediaMode === 'url' ? 'bg-purple-600 text-white' : 'text-slate-500'}`}>URL</button>
-                            </div>
-                          </div>
-                          {editMediaMode === 'url' ? (
-                            <div className="space-y-2">
-                              <input type="text" value={editFormState.mediaUrl || ''} onChange={(e) => setEditFormState({ ...editFormState, mediaUrl: e.target.value })} placeholder="Paste new media URL..." className="w-full bg-slate-900 border border-slate-800 p-2 rounded-xl text-xs text-white focus:outline-none" />
-                              {editFormState.type === 'video' && <input type="text" value={editFormState.thumbnail || ''} onChange={(e) => setEditFormState({ ...editFormState, thumbnail: e.target.value })} placeholder="Paste new thumbnail URL..." className="w-full bg-slate-900 border border-slate-800 p-2 rounded-xl text-xs text-white focus:outline-none" />}
-                            </div>
-                          ) : (
-                            <div className="flex gap-2 flex-wrap">
-                              <label className="flex-1 min-w-[140px] h-16 border border-dashed border-slate-800 hover:border-purple-500/50 bg-slate-900 rounded-xl flex flex-col items-center justify-center cursor-pointer p-2">
-                                <UploadCloud className="w-4 h-4 text-slate-600 mb-0.5" /><span className="text-[9px] text-slate-400 font-medium tracking-wide">Upload {editFormState.type}</span>
-                                <input ref={editFileInputRef} type="file" accept={editFormState.type === 'video' ? 'video/*' : 'image/*'} onChange={handleEditMediaFileChange} className="hidden" />
-                              </label>
-                              {editFormState.type === 'video' && (
-                                <label className="flex-1 min-w-[140px] h-16 border border-dashed border-slate-800 hover:border-purple-500/50 bg-slate-900 rounded-xl flex flex-col items-center justify-center cursor-pointer p-2">
-                                  <ImageIcon className="w-4 h-4 text-slate-600 mb-0.5" /><span className="text-[9px] text-slate-400 font-medium tracking-wide">Upload Thumbnail</span>
-                                  <input ref={editThumbInputRef} type="file" accept="image/*" onChange={handleEditThumbFileChange} className="hidden" />
-                                </label>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <label className="flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-900 p-2 text-center hover:border-purple-500/50">
+                          <UploadCloud className="mb-0.5 h-4 w-4 text-slate-600" />
+                          <span className="text-[9px] font-medium tracking-wide text-slate-400">
+                            {editMediaFile ? editMediaFile.name : `Optional verified ${editFormState.type} replacement`}
+                          </span>
+                          <input
+                            ref={editFileInputRef}
+                            type="file"
+                            accept={editFormState.type === 'video' ? 'video/*' : 'image/*'}
+                            onChange={handleEditMediaFileChange}
+                            disabled={isSavingEdit}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+
+                      {editUploadStatus && (
+                        <p role="status" aria-live="polite" className="text-xs text-purple-300">{editUploadStatus}</p>
                       )}
 
                       <div className="flex gap-2 pt-2">
-                        <button onClick={saveEditedAsset} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all"><Save className="w-3.5 h-3.5" /> Save Changes</button>
-                        <button onClick={cancelEditingAsset} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all"><Ban className="w-3.5 h-3.5" /> Cancel Modification</button>
+                        <button onClick={saveEditedAsset} disabled={isSavingEdit} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all disabled:cursor-wait disabled:opacity-60"><Save className="w-3.5 h-3.5" /> {isSavingEdit ? 'Saving...' : 'Save Changes'}</button>
+                        <button onClick={cancelEditingAsset} disabled={isSavingEdit} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all disabled:opacity-60"><Ban className="w-3.5 h-3.5" /> Cancel Modification</button>
                       </div>
                     </motion.div>
                   )}

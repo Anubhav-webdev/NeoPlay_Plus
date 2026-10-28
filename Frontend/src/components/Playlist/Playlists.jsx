@@ -1,154 +1,245 @@
-import React, { useState } from 'react';
-import { Folder,Trash2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { Folder, Trash2 } from "lucide-react";
+import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import Sidebar from "../Playlist/PlaylistSidebar";
+import PlaylistHeader from "../Playlist/PlaylistHeader";
+import NotesGrid from "../Playlist/PlaylistNotesGrid";
+import EditPlaylistModal from "../Playlist/EditPlaylistModal";
+import ImageCard from "../Image/ImageCard";
+import VideoCard from "../Video/Videocard";
+import {
+  addPlaylistContent,
+  createPlaylist as createPlaylistRequest,
+  deletePlaylist as deletePlaylistRequest,
+  getMyPlaylists,
+  removePlaylistContent,
+  updatePlaylist as updatePlaylistRequest,
+} from "../../api/playlistsApi";
+import { getPublishedContent } from "../../api/contentApi";
 
-
-import Sidebar from '../Playlist/PlaylistSidebar';
-import PlaylistHeader from '../Playlist/PlaylistHeader';
-import NotesGrid from '../Playlist/PlaylistNotesGrid';
-import EditPlaylistModal from '../Playlist/EditPlaylistModal';
-
-// Card Component Imports
-import ImageCard from '../Image/ImageCard'; 
-import VideoCard from '../Video/Videocard';
+function mapPlaylist(playlist) {
+  const items = (playlist.contentIds || []).filter(Boolean).map((content) => ({
+    ...content,
+    id: content._id,
+    type: content.type?.toLowerCase(),
+    thumb: content.thumbnailUrl || content.mediaUrl,
+    src: content.mediaUrl,
+    channel: content.creatorId?.displayName || "Creator",
+  }));
+  return {
+    id: playlist._id,
+    name: playlist.name,
+    visibility: playlist.isPublic ? "public" : "private",
+    count: items.length,
+    items,
+  };
+}
 
 export default function PlaylistDashboard() {
-  const [playlists, setPlaylists] = useState([
-    { id: 1, name: 'Project References', description: 'UI patterns and demos worth revisiting.', visibility: 'private', count: 4 },
-    { id: 2, name: 'UI Inspirations', description: 'Public moodboard, shareable with the team.', visibility: 'public', count: 3 },
-  ]);
-  const [activePlaylistId, setActivePlaylistId] = useState(1);
-  const [activeTab, setActiveTab] = useState('media'); // 'media' | 'notes'
+  const user = useSelector((state) => state.auth.user);
+  const navigate = useNavigate();
+  const [playlists, setPlaylists] = useState([]);
+  const [activePlaylistId, setActivePlaylistId] = useState(null);
+  const [activeTab, setActiveTab] = useState("media");
+  const [notes, setNotes] = useState([]);
+  const [loadedUserId, setLoadedUserId] = useState(null);
+  const [error, setError] = useState("");
+  const userId = user?._id || user?.id;
+  const loading = Boolean(user && loadedUserId !== userId);
+  const [availableContent, setAvailableContent] = useState([]);
+  const [selectedContentId, setSelectedContentId] = useState("");
+  const [showAddContent, setShowAddContent] = useState(false);
 
-  // Updated state matching the keys from export const VIDEOS and IMAGES datasets
-  const [mediaItems, setMediaItems] = useState([
-    // Videos mapped from VIDEOS mock data structure
-    { id: 1, playlistId: 1, type: 'video', title: "Big Buck Bunny", views: "10.3k", time: "44 minutes ago", channel: "Bunny", duration: "0:38", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600",avatar: "https://images.pexels.com/photos/2519812/pexels-photo-2519812.jpeg?auto=compress&cs=tinysrgb&w=100",  Catagory: "Cartoon" },
-    { id: 2, playlistId: 1, type: 'video', title: "Getting Started with Express.js", views: "11k", time: "5 hours ago", channel: "Express Learner", duration: "3:44", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/2519812/pexels-photo-2519812.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Education" },
-    
-    // Images mapped from IMAGES mock data structure
-    { id: 3, playlistId: 1, type: 'image', title: "Beautiful Landscape", views: "5.2k", time: "2 hours ago", channel: "Nature Lover", thumb: "https://images.pexels.com/photos/210186/pexels-photo-210186.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Nature" },
-    { id: 4, playlistId: 1, type: 'image', title: "City Skyline at Night", views: "8.7k", time: "4 hours ago", channel: "Urban Explorer", thumb: "https://images.pexels.com/photos/338515/pexels-photo-338515.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Urban" },
-    { id: 5, playlistId: 1, type: 'video', title: "Big Buck Bunny", views: "10.3k", time: "44 minutes ago", channel: "Bunny", duration: "0:38", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600",avatar: "https://images.pexels.com/photos/2519812/pexels-photo-2519812.jpeg?auto=compress&cs=tinysrgb&w=100",  Catagory: "Cartoon" },
-    { id: 6, playlistId: 1, type: 'video', title: "Getting Started with Express.js", views: "11k", time: "5 hours ago", channel: "Express Learner", duration: "3:44", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/2519812/pexels-photo-2519812.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Education" },
-    
-    // Images mapped from IMAGES mock data structure
-    { id: 7, playlistId: 1, type: 'image', title: "Beautiful Landscape", views: "5.2k", time: "2 hours ago", channel: "Nature Lover", thumb: "https://images.pexels.com/photos/210186/pexels-photo-210186.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Nature" },
-    { id: 8, playlistId: 1, type: 'image', title: "City Skyline at Night", views: "8.7k", time: "4 hours ago", channel: "Urban Explorer", thumb: "https://images.pexels.com/photos/338515/pexels-photo-338515.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Urban" },
-    
-    
-    // Playlist 2 setup items
-    { id: 5, playlistId: 2, type: 'video', title: "Building a RESTful API with Node.js and Express", views: "14.5k", time: "7 hours ago", channel: "API Builder", duration: "24:33", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/1739942/pexels-photo-1739942.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Technology" },
-    { id: 6, playlistId: 2, type: 'image', title: "Delicious Food Platter", views: "12.1k", time: "6 hours ago", channel: "Foodie", thumb: "https://images.pexels.com/photos/70497/pexels-photo-70497.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100" },
-    { id: 7, playlistId: 2, type: 'image', title: "Cute Puppy Playing", views: "9.4k", time: "8 hours ago", channel: "Animal Lover", thumb: "https://images.pexels.com/photos/4587990/pexels-photo-4587990.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100" }
-  ]);
-
-  const [notes, setNotes] = useState([
-    { id: 1, playlistId: 1, title: 'Kickoff prep', content: 'Topics to cover: goals, timeline, who owns what.', updatedAt: 'Jul 2' },
-  ]);
-
-  // ---- playlist editing states ----
-  const [editingPlaylistId, setEditingPlaylistId] = useState(null); 
-  const [editPlaylistName, setEditPlaylistName] = useState('');
-  const [fullEditPlaylist, setFullEditPlaylist] = useState(null); 
-  const [draftName, setDraftName] = useState('');
-  const [draftDesc, setDraftDesc] = useState('');
-  const [draftVisibility, setDraftVisibility] = useState('private');
-
-  // ---- notes editing states ----
+  const [editingPlaylistId, setEditingPlaylistId] = useState(null);
+  const [editPlaylistName, setEditPlaylistName] = useState("");
+  const [fullEditPlaylist, setFullEditPlaylist] = useState(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftVisibility, setDraftVisibility] = useState("private");
   const [editingNoteId, setEditingNoteId] = useState(null);
-  const [noteDraft, setNoteDraft] = useState({ title: '', content: '' });
+  const [noteDraft, setNoteDraft] = useState({ title: "", content: "" });
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    if (!user) return undefined;
+    const controller = new AbortController();
+    getMyPlaylists({ signal: controller.signal })
+      .then((result) => {
+        const mapped = result.map(mapPlaylist);
+        setPlaylists(mapped);
+        setActivePlaylistId((current) =>
+          mapped.some((playlist) => playlist.id === current)
+            ? current
+            : mapped[0]?.id || null,
+        );
+        setError("");
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) setError(loadError.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadedUserId(userId);
+      });
+    return () => controller.abort();
+  }, [user, userId]);
 
-  // ---------- playlist helpers ----------
-  const createPlaylist = () => {
-    const newPlaylist = { id: Date.now(), name: 'New Playlist', description: '', visibility: 'private', count: 0 };
-    setPlaylists([...playlists, newPlaylist]);
-    setActivePlaylistId(newPlaylist.id);
-    setActiveTab('media');
-    startEditingPlaylist(newPlaylist.id, newPlaylist.name);
+  const createPlaylist = async () => {
+    try {
+      const playlist = mapPlaylist(await createPlaylistRequest("New Playlist"));
+      setPlaylists((current) => [playlist, ...current]);
+      setActivePlaylistId(playlist.id);
+      setActiveTab("media");
+      setEditingPlaylistId(playlist.id);
+      setEditPlaylistName(playlist.name);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
-  const deletePlaylist = (id, e) => {
-    e.stopPropagation();
-    const remaining = playlists.filter(p => p.id !== id);
-    setPlaylists(remaining);
-    setMediaItems(mediaItems.filter(m => m.playlistId !== id));
-    setNotes(notes.filter(n => n.playlistId !== id));
-    if (activePlaylistId === id) setActivePlaylistId(remaining[0]?.id || null);
+  const deletePlaylist = async (id, event) => {
+    event?.stopPropagation();
+    try {
+      await deletePlaylistRequest(id);
+      setPlaylists((current) => {
+        const remaining = current.filter((playlist) => playlist.id !== id);
+        if (activePlaylistId === id) setActivePlaylistId(remaining[0]?.id || null);
+        return remaining;
+      });
+      setNotes((current) => current.filter((note) => note.playlistId !== id));
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
-  const startEditingPlaylist = (id, currentName) => {
-    setEditingPlaylistId(id);
-    setEditPlaylistName(currentName);
-  };
-
-  const savePlaylistName = (id) => {
-    setPlaylists(playlists.map(p => p.id === id ? { ...p, name: editPlaylistName || p.name } : p));
-    setEditingPlaylistId(null);
+  const savePlaylistName = async (id) => {
+    try {
+      const updated = mapPlaylist(await updatePlaylistRequest(id, { name: editPlaylistName }));
+      setPlaylists((current) => current.map((playlist) => playlist.id === id ? updated : playlist));
+      setEditingPlaylistId(null);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
   const openFullEdit = (playlist) => {
     setFullEditPlaylist(playlist.id);
     setDraftName(playlist.name);
-    setDraftDesc(playlist.description || '');
     setDraftVisibility(playlist.visibility);
   };
 
-  const saveFullEdit = () => {
-    setPlaylists(playlists.map(p => p.id === fullEditPlaylist
-      ? { ...p, name: draftName || p.name, description: draftDesc, visibility: draftVisibility }
-      : p));
-    setFullEditPlaylist(null);
+  const saveFullEdit = async () => {
+    try {
+      const updated = mapPlaylist(await updatePlaylistRequest(fullEditPlaylist, {
+        name: draftName,
+        isPublic: draftVisibility === "public",
+      }));
+      setPlaylists((current) => current.map((playlist) =>
+        playlist.id === fullEditPlaylist ? updated : playlist,
+      ));
+      setFullEditPlaylist(null);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
-  const toggleVisibilityQuick = (id, e) => {
-    e.stopPropagation();
-    setPlaylists(playlists.map(p => p.id === id
-      ? { ...p, visibility: p.visibility === 'public' ? 'private' : 'public' }
-      : p));
+  const toggleVisibilityQuick = async (id, event) => {
+    event.stopPropagation();
+    const playlist = playlists.find((item) => item.id === id);
+    if (!playlist) return;
+    try {
+      const updated = mapPlaylist(await updatePlaylistRequest(id, {
+        isPublic: playlist.visibility !== "public",
+      }));
+      setPlaylists((current) => current.map((item) => item.id === id ? updated : item));
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
-  const deleteMedia = (id) => {
-    setMediaItems(mediaItems.filter(m => m.id !== id));
-    setPlaylists(playlists.map(p => p.id === activePlaylistId ? { ...p, count: Math.max(0, p.count - 1) } : p));
+  const deleteMedia = async (contentId) => {
+    try {
+      const updated = mapPlaylist(await removePlaylistContent(activePlaylistId, contentId));
+      setPlaylists((current) => current.map((playlist) =>
+        playlist.id === activePlaylistId ? updated : playlist,
+      ));
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   };
 
-  // ---------- notes helpers ----------
+  const openAddContent = async () => {
+    if (showAddContent) {
+      setShowAddContent(false);
+      return;
+    }
+    try {
+      setAvailableContent(await getPublishedContent());
+      setSelectedContentId("");
+      setShowAddContent(true);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const addContent = async () => {
+    if (!selectedContentId || !activePlaylistId) return;
+    try {
+      const updated = mapPlaylist(await addPlaylistContent(activePlaylistId, selectedContentId));
+      setPlaylists((current) => current.map((playlist) =>
+        playlist.id === activePlaylistId ? updated : playlist,
+      ));
+      setShowAddContent(false);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
   const addNote = () => {
-    const newNote = { id: Date.now(), playlistId: activePlaylistId, title: 'New note', content: '', updatedAt: 'now' };
-    setNotes([newNote, ...notes]);
-    setEditingNoteId(newNote.id);
-    setNoteDraft({ title: newNote.title, content: '' });
+    const note = { id: Date.now(), playlistId: activePlaylistId, title: "New note", content: "", updatedAt: "now" };
+    setNotes((current) => [note, ...current]);
+    setEditingNoteId(note.id);
+    setNoteDraft({ title: note.title, content: "" });
   };
-
   const startEditNote = (note) => {
     setEditingNoteId(note.id);
     setNoteDraft({ title: note.title, content: note.content });
   };
-
   const saveNote = (id) => {
-    setNotes(notes.map(n => n.id === id
-      ? { ...n, title: noteDraft.title || 'Untitled note', content: noteDraft.content, updatedAt: 'now' }
-      : n));
+    setNotes((current) => current.map((note) => note.id === id
+      ? { ...note, title: noteDraft.title || "Untitled note", content: noteDraft.content, updatedAt: "now" }
+      : note));
     setEditingNoteId(null);
   };
-
   const deleteNote = (id) => {
-    setNotes(notes.filter(n => n.id !== id));
+    setNotes((current) => current.filter((note) => note.id !== id));
     if (editingNoteId === id) setEditingNoteId(null);
   };
 
-  const activeMedia = mediaItems
-    .filter(m => m.playlistId === activePlaylistId)
-    .filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()));
-  const activeNotes = notes.filter(n => n.playlistId === activePlaylistId);
-  const activePlaylist = playlists.find(p => p.id === activePlaylistId);
+  const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId);
+  const activeMedia = (activePlaylist?.items || []).filter((item) =>
+    item.title.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+  const activeNotes = notes.filter((note) => note.playlistId === activePlaylistId);
+
+  if (!user) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-white">
+        <p>Sign in to manage your playlists.</p>
+        <button className="rounded-lg bg-purple-600 px-4 py-2" onClick={() => navigate("/signup")}>Sign in</button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-transparent text-white font-sans selection:bg-purple-500/30 md:fixed z-10 relative pb-15 ">
-      
-      {/* Sidebar Navigation */}
+    <div className="flex h-screen flex-col bg-transparent text-white font-sans selection:bg-purple-500/30 md:fixed md:flex-row relative z-10 pb-15">
       <Sidebar
         playlists={playlists}
         activePlaylistId={activePlaylistId}
@@ -162,12 +253,10 @@ export default function PlaylistDashboard() {
         toggleVisibilityQuick={toggleVisibilityQuick}
         openFullEdit={openFullEdit}
         deletePlaylist={deletePlaylist}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
       />
-
-      {/* Main Area */}
-      <main className="flex-1 flex flex-col relative w-full h-full overflow-hidden ">
-        
-        {/* Top Header */}
+      <main className="relative flex h-full w-full flex-1 flex-col overflow-hidden">
         <PlaylistHeader
           activePlaylist={activePlaylist}
           activePlaylistId={activePlaylistId}
@@ -175,73 +264,103 @@ export default function PlaylistDashboard() {
           setActiveTab={setActiveTab}
           activeMediaCount={activeMedia.length}
           activeNotesCount={activeNotes.length}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
           addNote={addNote}
           openFullEdit={openFullEdit}
           deletePlaylist={deletePlaylist}
         />
-
-        {/* Dynamic Body Content Grid */}
-{/* Dynamic Body Content Grid */}
-<div className="flex-1 overflow-y-auto p-2 md:p-2  mb-8 w-full bg-[#0b1220]">
-  {!activePlaylistId ? (
-    <div className="flex flex-col items-center justify-center h-full text-gray-500 min-h-[50vh]">
-      <Folder size={48} className="mb-4 opacity-20 text-purple-400" />
-      <p>Create a playlist to get started.</p>
-    </div>
-  ) : activeTab === 'media' ? (
-    /* Media uses the shared VideoCard and ImageCard presentation. */
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {activeMedia.length === 0 ? (
-        <div className="col-span-full text-center text-gray-500 py-10">
-          No items found matching "{searchTerm}"
+        <div className="mb-8 flex-1 overflow-y-auto bg-[#0b1220] p-2">
+          {error && <p role="alert" className="mb-4 text-center text-sm text-red-300">{error}</p>}
+          {loading ? (
+            <p className="py-10 text-center text-gray-400">Loading playlists...</p>
+          ) : !activePlaylistId ? (
+            <div className="flex min-h-[50vh] flex-col items-center justify-center text-gray-500">
+              <Folder size={48} className="mb-4 text-purple-400 opacity-20" />
+              <p>Create a playlist to get started.</p>
+            </div>
+          ) : activeTab === "media" ? (
+            <>
+              <div className="mb-4 flex justify-end">
+                <button
+                  onClick={openAddContent}
+                  className="rounded-lg bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-500"
+                >
+                  {showAddContent ? "Cancel" : "Add published content"}
+                </button>
+              </div>
+              {showAddContent && (
+                <div className="mb-5 flex flex-col gap-2 rounded-xl border border-white/10 p-4 sm:flex-row">
+                  <select
+                    value={selectedContentId}
+                    onChange={(event) => setSelectedContentId(event.target.value)}
+                    className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">Choose published content</option>
+                    {availableContent
+                      .filter((item) => !activePlaylist.items.some((saved) => saved.id === item._id))
+                      .map((item) => (
+                        <option key={item._id} value={item._id}>{item.title}</option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={addContent}
+                    disabled={!selectedContentId}
+                    className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                  >
+                    Add to playlist
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {activeMedia.length === 0 ? (
+                  <div className="col-span-full py-10 text-center text-gray-500">
+                    No items in this playlist yet.
+                  </div>
+                ) : activeMedia.map((item) => (
+                  <div key={item.id} className="group relative min-w-0">
+                    {item.type === "image" ? (
+                      <ImageCard image={item} className="w-full" />
+                    ) : item.type === "video" ? (
+                      <VideoCard video={item} className="w-full animate-fade-in" />
+                    ) : (
+                      <div className="rounded-xl border border-white/10 bg-slate-900 p-4">
+                        <p className="text-sm text-white">{item.title}</p>
+                        <p className="mt-2 text-xs text-gray-400">{item.description}</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => deleteMedia(item.id)}
+                      aria-label={`Remove ${item.title} from playlist`}
+                      title="Remove from playlist"
+                      className="absolute left-3 top-3 z-30 rounded-md bg-rose-600/90 p-2 text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 hover:bg-rose-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-xs text-gray-500">Notes are not saved to the server and will be lost when you leave this page.</p>
+              <NotesGrid
+                activeNotes={activeNotes}
+                editingNoteId={editingNoteId}
+                setEditingNoteId={setEditingNoteId}
+                noteDraft={noteDraft}
+                setNoteDraft={setNoteDraft}
+                startEditNote={startEditNote}
+                saveNote={saveNote}
+                deleteNote={deleteNote}
+              />
+            </>
+          )}
         </div>
-      ) : (
-        activeMedia.map((item) => (
-          <div key={item.id} className="group relative min-w-0">
-            {item.type === 'image' ? (
-              <ImageCard image={item} className="w-full" />
-            ) : (
-              <VideoCard video={item} className="w-full animate-fade-in" />
-            )}
-
-            {/* Delete Button overlaying the cards cleanly */}
-            <button 
-              onClick={() => deleteMedia(item.id)}
-              aria-label={`Remove ${item.title} from playlist`}
-              title="Remove from playlist"
-              className="absolute left-3 top-3 z-30 rounded-md bg-rose-600/90 p-2 text-white opacity-0 shadow-md transition-opacity duration-300 group-hover:opacity-100 hover:bg-rose-500"
-            >
-              <Trash2 size={14} /> 
-            </button>
-          </div>
-        ))
-      )}
-    </div>
-  ) : (
-    <NotesGrid
-      activeNotes={activeNotes}
-      editingNoteId={editingNoteId}
-      setEditingNoteId={setEditingNoteId}
-      noteDraft={noteDraft}
-      setNoteDraft={setNoteDraft}
-      startEditNote={startEditNote}
-      saveNote={saveNote}
-      deleteNote={deleteNote}
-    />
-  )}
-</div>
       </main>
-
-      {/* Full Playlist Edit Modal Context */}
       <EditPlaylistModal
         fullEditPlaylist={fullEditPlaylist}
         setFullEditPlaylist={setFullEditPlaylist}
         draftName={draftName}
         setDraftName={setDraftName}
-        draftDesc={draftDesc}
-        setDraftDesc={setDraftDesc}
         draftVisibility={draftVisibility}
         setDraftVisibility={setDraftVisibility}
         saveFullEdit={saveFullEdit}

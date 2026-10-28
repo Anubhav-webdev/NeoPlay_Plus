@@ -1,140 +1,178 @@
-import React, { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Radio, Layers } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { Layers, Radio } from "lucide-react";
+import ProfileHeroHub from "./ProfileHeroHub";
+import MediaCatalogStream from "./MediaCatalogStream";
+import { getPublishedContent, getPublishedCreatorById } from "../../../api/contentApi";
+import {
+  getCreatorSubscriptionStatus,
+  setCreatorSubscribed,
+} from "../../../api/subscriptionsApi";
 
-// Sub-component layout bindings
-import ProfileHeroHub from '../../components/Profile/CreatorProfile/ProfileHeroHub';
-import MediaCatalogStream from '../../components/Profile/CreatorProfile/MediaCatalogStream';
-import BroadcastLogSidebar from '../../components/Profile/CreatorProfile/BroadcastLogSidebar';
-
-// Data 
-import { VIDEOS, IMAGES, initialTweets } from "../../constants/data";
-
-
-const cardHover = {
-  rest: { y: 0, scale: 1, boxShadow: '0px 0px 0px rgba(139, 92, 246, 0)' },
-  hover: { 
-    y: -6, 
-    scale: 1.01, 
-    boxShadow: '0px 10px 30px rgba(139, 92, 246, 0.12)',
-    transition: { duration: 0.3, ease: 'easeOut' } 
+function toCatalogItem(item) {
+  const creator = item.creatorId || {};
+  const common = {
+    id: item._id,
+    creatorId: creator._id,
+    title: item.title,
+    description: item.description,
+    channel: creator.displayName || "Creator",
+    avatar: creator.avatar || "",
+  };
+  if (item.type === "Video") {
+    return { ...common, type: "video", thumb: item.thumbnailUrl || item.mediaUrl, src: item.mediaUrl, category: "Video" };
   }
-};
-
-const GlassCard = ({ children, className = '', ...props }) => (
-  <motion.div 
-    variants={cardHover}
-    initial="rest"
-    whileHover="hover"
-    className={`bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-[24px] p-6 text-white shadow-xl transition-colors duration-300 hover:border-purple-500/30 ${className}`}
-    {...props}
-  >
-    {children}
-  </motion.div>
-);
-// Hoisted Static Data Configs
-const CHANNEL_IDENTITY = {
-  name: "Apex Cyber Studio",
-  handle: "apex_cyber_studios",
-  tagline: "High-Fidelity Engineering Pipelines & Next-Gen UI Layouts",
-  bio: "Engineering real-time high-fidelity graphics tutorials, architectural devlogs, and next-gen UI design systems built directly on bare-metal canvas components.",
-  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ApexStudio",
-  banner: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1600&q=80",
-  subscribers: "842K",
-  totalVideos: 42,
-  isVerified: true
-};
-const SUMMARY_METRICS = [
-  { label: 'Total Subscribers', val: CHANNEL_IDENTITY.subscribers, icon: Radio, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-  { label: 'Active Artifacts', val: `${CHANNEL_IDENTITY.totalVideos} Blocks`, icon: Layers, color: 'text-cyan-400', bg: 'bg-cyan-500/10' }
-];
+  if (item.type === "Image") {
+    return { ...common, type: "image", thumb: item.mediaUrl, src: item.mediaUrl, category: "Image" };
+  }
+  return {
+    ...common,
+    type: "tweet",
+    name: creator.displayName || "Creator",
+    handle: (creator.displayName || "creator").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+    content: item.description || item.title,
+    time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
+    likes: 0,
+    retweets: 0,
+    commentCount: item.commentCount || 0,
+    hasPreview: Boolean(item.mediaUrl),
+    mediaUrl: item.mediaUrl || "",
+    mediaType: item.mediaAssetId?.mediaType || "",
+    initialComments: [],
+    isBackendContent: true,
+    category: "Tweet",
+  };
+}
 
 export default function CreatorProfile() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [profileTab, setProfileTab] = useState('all'); 
+  const { creatorId } = useParams();
+  const user = useSelector((state) => state.auth.user);
+  const navigate = useNavigate();
+  const [creator, setCreator] = useState(null);
+  const [catalog, setCatalog] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [profileTab, setProfileTab] = useState("all");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(null);
+  const [updatingSubscription, setUpdatingSubscription] = useState(false);
+  const [loadedCreatorId, setLoadedCreatorId] = useState(null);
+  const [error, setError] = useState("");
+  const loading = loadedCreatorId !== creatorId;
 
-const streamCatalog = useMemo(() => {
- const videos = VIDEOS.map((video) => ({
-  ...video,
-  id: `video-${video.id}`,
-  type: "video",
-  category: video.Catagory ?? "Video",
-}));
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      getPublishedCreatorById(creatorId, { signal: controller.signal }),
+      getPublishedContent(undefined, { signal: controller.signal, creatorId }),
+    ])
+      .then(async ([profile, content]) => {
+        setCreator(profile);
+        setCatalog(content.map(toCatalogItem));
+        if (user) {
+          const status = await getCreatorSubscriptionStatus(profile._id, {
+            signal: controller.signal,
+          });
+          if (!controller.signal.aborted) {
+            setIsSubscribed(status.subscribed);
+            setSubscriberCount(status.subscriberCount);
+          }
+        } else {
+          setIsSubscribed(false);
+          setSubscriberCount(null);
+        }
+        setError("");
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) setError(loadError.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadedCreatorId(creatorId);
+      });
+    return () => controller.abort();
+  }, [creatorId, user]);
 
-const images = IMAGES.map((image) => ({
-  ...image,
-  id: `image-${image.id}`,
-  type: "image",
-  category: "Image",
-}));
-
-const tweets = initialTweets.map((tweet) => ({
-  ...tweet,
-  id: `tweet-${tweet.id}`,
-  type: "tweet",
-  title: tweet.content,
-  category: "Tweet",
-}));
-
-
-  return [...videos, ...images, ...tweets];
-}, []);
-  // Memoized Filtering Framework Engine
   const filteredCatalog = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    return streamCatalog.filter(item => {
+    return catalog.filter((item) => {
       const matchesSearch = !query ||
-  item.title?.toLowerCase().includes(query) ||
-  item.category?.toLowerCase().includes(query);
-      const matchesTab = profileTab === 'all' || item.type === profileTab;
-      return matchesSearch && matchesTab;
+        item.title?.toLowerCase().includes(query) ||
+        item.category?.toLowerCase().includes(query);
+      return matchesSearch && (profileTab === "all" || item.type === profileTab);
     });
-  }, [streamCatalog, searchQuery, profileTab]);
+  }, [catalog, profileTab, searchQuery]);
+
+  const toggleSubscription = async () => {
+    if (!user) {
+      navigate("/signup");
+      return;
+    }
+    setUpdatingSubscription(true);
+    setError("");
+    try {
+      const result = await setCreatorSubscribed(creator._id, !isSubscribed);
+      setIsSubscribed(result.subscribed);
+      setSubscriberCount(result.subscriberCount);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUpdatingSubscription(false);
+    }
+  };
+
+  if (loading) {
+    return <p className="py-20 text-center text-gray-400">Loading creator profile...</p>;
+  }
+  if (error && (!creator || creator._id !== creatorId)) {
+    return <p role="alert" className="py-20 text-center text-red-300">{error}</p>;
+  }
+  if (!creator || creator._id !== creatorId) return null;
+
+  const channelIdentity = {
+    id: creator._id,
+    name: creator.displayName,
+    handle: creator.displayName.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+    avatar: creator.avatar,
+    createdAt: creator.createdAt,
+  };
 
   return (
     <div className="min-h-screen bg-transparent text-slate-100 relative overflow-x-hidden antialiased selection:bg-purple-500/30 selection:text-purple-200 pb-12 all-font">
-      {/* Background Ambience Visual Overlays */}
       <div className="absolute top-0 inset-x-0 h-[600px] bg-gradient-to-b from-purple-950/15 via-blue-950/5 to-transparent pointer-events-none z-0" />
-      <div className="absolute top-[20%] -left-[10%] w-[500px] h-[500px] bg-purple-600/5 blur-[140px] rounded-full pointer-events-none" />
-      <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] bg-cyan-600/5 blur-[140px] rounded-full pointer-events-none" />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6 relative z-10">
-        <ProfileHeroHub 
-          channelIdentity={CHANNEL_IDENTITY}
+        <ProfileHeroHub
+          channelIdentity={channelIdentity}
           isSubscribed={isSubscribed}
-          setIsSubscribed={setIsSubscribed}
+          onToggleSubscription={toggleSubscription}
+          subscriptionBusy={updatingSubscription}
+          subscriberCount={subscriberCount}
         />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Quick Stat Blocks Summary */}
+        {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        <div className="grid grid-cols-1 gap-6 items-start">
+          <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {SUMMARY_METRICS.map((item, idx) => (
-                <GlassCard key={idx} className="p-4 flex flex-row items-center gap-4 min-h-[90px]">
-                  <div className={`p-3 rounded-xl flex-shrink-0 ${item.bg}`}>
-                    <item.icon className={`w-5 h-5 ${item.color}`} />
+              {[
+                ...(subscriberCount === null ? [] : [
+                  { label: "Subscribers", value: subscriberCount, icon: Radio, color: "text-purple-400", bg: "bg-purple-500/10" },
+                ]),
+                { label: "Published content", value: catalog.length, icon: Layers, color: "text-cyan-400", bg: "bg-cyan-500/10" },
+              ].map((metric) => (
+                <div key={metric.label} className="flex min-h-[90px] items-center gap-4 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-4">
+                  <div className={`rounded-xl p-3 ${metric.bg}`}><metric.icon className={`h-5 w-5 ${metric.color}`} /></div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">{metric.label}</p>
+                    <h3 className="mt-0.5 text-lg font-bold text-white">{metric.value}</h3>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">{item.label}</p>
-                    <h3 className="text-lg font-bold text-white tracking-tight mt-0.5">{item.val}</h3>
-                  </div>
-                </GlassCard>
+                </div>
               ))}
             </div>
-
-            {/* Child Stream Consumer Interface */}
-            <MediaCatalogStream 
+            <MediaCatalogStream
               profileTab={profileTab}
               setProfileTab={setProfileTab}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               filteredCatalog={filteredCatalog}
             />
-          </div>
-
-          <div className="space-y-6">
-            <BroadcastLogSidebar />
           </div>
         </div>
       </div>

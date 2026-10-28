@@ -21,6 +21,8 @@ import WatchHistory from './components/History/WatchHistory.jsx'
 import Settings from './components/pages/Settings.jsx'
 import HelpSupport from './components/Help&Support/HelpSupport.jsx'
 import Report from './components/pages/Report.jsx'
+import MediaDuplicateReviews from './components/pages/MediaDuplicateReviews.jsx'
+import CreatorProfile from './components/Profile/CreatorProfile/CreatorProfile.jsx'
 
 import LoginAndSignup from './components/Auth/LoginAndSignup.jsx'
 import VideoDetail from './components/Video/VideoDetail.jsx'
@@ -41,10 +43,12 @@ createRoot(document.getElementById('root')).render(
             <Route path="wishlist" element={<Wishlist />} />
             <Route path="watch-history" element={<WatchHistory />} />
             <Route path="creator-dashboard" element={<CreatorDashboard />} />
+            <Route path="admin/media-reviews" element={<MediaDuplicateReviews />} />
             <Route path="settings" element={<Settings />} />
             <Route path="help-support" element={<HelpSupport />} />
             <Route path="report" element={<Report />} />
             <Route path="video/:id" element={<VideoDetail />} />
+            <Route path="creator/:creatorId" element={<CreatorProfile />} />
             <Route path="signup" element={<LoginAndSignup />} />
           </Route>
         </Routes>

@@ -1,12 +1,30 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { FiSearch, FiMenu, FiX, FiUser, FiChevronDown } from "react-icons/fi";
 import Logo from "../../photo&Video/logo.png";
 import {motion}  from "framer-motion";
+import { logout } from "../../redux/slices/authSlice";
+import { logoutFromApi } from "../../api/authApi";
 
 export function Header({ searchOpen, setSearchOpen, mobileSidebarOpen, setMobileSidebarOpen }) {
   const [scrolled, setScrolled] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+
+  const handleLogout = async () => {
+    try {
+      await logoutFromApi();
+    } catch (error) {
+      console.error("Could not end the server session", error);
+    } finally {
+      dispatch(logout());
+      setAccountMenuOpen(false);
+      navigate("/");
+    }
+  };
 
   // Adds a nice background blur when page scrolls down
   useEffect(() => {
@@ -68,8 +86,9 @@ export function Header({ searchOpen, setSearchOpen, mobileSidebarOpen, setMobile
           </button>
 
           {/* Right Side Man Icon with Account Actions */}
+       <div className="relative">
        <motion.button
-  onClick={() => navigate("/Signup")}
+  onClick={() => user ? setAccountMenuOpen((open) => !open) : navigate("/signup")}
   initial="rest"
   whileHover="hover"
   whileTap="tap"
@@ -79,7 +98,7 @@ export function Header({ searchOpen, setSearchOpen, mobileSidebarOpen, setMobile
     tap: { scale: 0.98 }
   }}
   className="flex items-center gap-1 rounded-full p-1 md:rounded-lg md:border md:border-[#00E5FF]/20 md:bg-[#070B14]/80 md:p-1.5 md:pr-3 cursor-pointer select-none"
-  aria-label="Sign in"
+  aria-label={user ? "Open profile menu" : "Sign in"}
 >
   <motion.div 
     variants={{
@@ -93,8 +112,8 @@ export function Header({ searchOpen, setSearchOpen, mobileSidebarOpen, setMobile
   </motion.div>
 
   <div className="hidden md:flex flex-col items-start ml-2 text-left">
-    <span className="text-xs font-semibold text-white/90 leading-none tracking-wider">Sign In</span>
-    <span className="text-[10px] text-white/40 mt-0.5 tracking-wider all-font">Account</span>
+    <span className="text-xs font-semibold text-white/90 leading-none tracking-wider">{user ? "Profile" : "Sign In"}</span>
+    <span className="text-[10px] text-white/40 mt-0.5 tracking-wider all-font">{user ? (user.username || "Account") : "Account"}</span>
   </div>
 
   <motion.div 
@@ -108,6 +127,38 @@ export function Header({ searchOpen, setSearchOpen, mobileSidebarOpen, setMobile
     <FiChevronDown className="h-3.5 w-3.5 text-white/30" />
   </motion.div>
 </motion.button>
+          {user && accountMenuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-white/10 bg-[#111827] p-2 shadow-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate("/settings");
+                  setAccountMenuOpen(false);
+                }}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"
+              >
+                Account settings
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigate("/creator-dashboard");
+                  setAccountMenuOpen(false);
+                }}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"
+              >
+                {user.role === "creator" ? "Creator Dashboard" : "Become a Creator"}
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full rounded-lg px-3 py-2 text-left text-sm text-red-300 hover:bg-red-500/10"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+          </div>
 
           {/* Hamburger Menu Toggle (STRICTLY MOBILE ONLY: hidden on md and up) */}
           <button

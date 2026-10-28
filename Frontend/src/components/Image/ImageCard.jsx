@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { FiCheck, FiHeart, FiX } from "react-icons/fi";
+import { getContentLikeStatus, setContentLiked } from "../../api/likesApi";
 
 export default function ImageCard({
   image,
@@ -8,10 +11,27 @@ export default function ImageCard({
   liked: controlledLiked,
   onLike,
 }) {
+  const user = useSelector((state) => state.auth.user);
+  const navigate = useNavigate();
   const [localLiked, setLocalLiked] = useState(false);
+  const [savingLike, setSavingLike] = useState(false);
+  const [likeError, setLikeError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const imageSource = image.thumb || image.src || image.url;
-  const liked = controlledLiked ?? localLiked;
+  const liked = image.isBackendContent ? localLiked : controlledLiked ?? localLiked;
+
+  useEffect(() => {
+    if (!image.isBackendContent) return undefined;
+    const controller = new AbortController();
+    getContentLikeStatus(image.id, { signal: controller.signal })
+      .then((status) => {
+        if (!controller.signal.aborted) setLocalLiked(status.liked);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setLikeError(error.message);
+      });
+    return () => controller.abort();
+  }, [image.id, image.isBackendContent, user]);
 
   // Prevent background scrolling when fullscreen is active
   useEffect(() => {
@@ -25,9 +45,26 @@ export default function ImageCard({
     };
   }, [isFullscreen]);
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (image.isBackendContent) {
+      if (!user) {
+        navigate("/signup");
+        return;
+      }
+      setSavingLike(true);
+      setLikeError("");
+      try {
+        const result = await setContentLiked(image.id, !liked);
+        setLocalLiked(result.liked);
+      } catch (error) {
+        setLikeError(error.message || "Could not update like.");
+      } finally {
+        setSavingLike(false);
+      }
+      return;
+    }
     setLocalLiked((value) => !value);
     onLike?.(!liked);
   };
@@ -75,6 +112,7 @@ export default function ImageCard({
           {/* Floating Like Button */}
           <button
             onClick={handleLike}
+            disabled={savingLike}
             aria-label="Like image"
             className={`absolute top-3 right-3 h-9 w-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300 shadow-md transform hover:scale-115 active:scale-95 z-10 ${
               liked 
@@ -90,6 +128,8 @@ export default function ImageCard({
           </button>
         </div>
       </div>
+
+      {likeError && <p role="alert" className="mt-1 text-xs text-red-300">{likeError}</p>}
 
       {/* --- Fullscreen Modal --- */}
       {isFullscreen && createPortal(

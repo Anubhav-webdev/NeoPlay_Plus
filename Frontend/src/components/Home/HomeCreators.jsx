@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import CreatorCard from "../cards/CreatorCards"; 
 import {
@@ -6,10 +7,30 @@ import {
   ChannelLabel,
 } from "./HomeConstants";
 
-import { creators } from "../../constants/data";
+import { getPublishedCreators } from "../../api/contentApi";
 
 export default function HomeCreators() {
   const [creatorRef, scrollCreator] = useHScroll();
+  const [creators, setCreators] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPublishedCreators({ signal: controller.signal })
+      .then((items) => {
+        setCreators(items.map((creator) => ({
+          id: creator._id,
+          name: creator.displayName,
+          handle: creator.userId?.username ? `@${creator.userId.username}` : "@creator",
+          avatar: creator.avatar || "",
+        })));
+        setError("");
+      })
+      .catch((loadError) => {
+        if (loadError.name !== "AbortError") setError(loadError.message);
+      });
+    return () => controller.abort();
+  }, []);
 
   return (
     <motion.section
@@ -29,6 +50,7 @@ export default function HomeCreators() {
         ref={creatorRef}
         className="hide-scrollbar flex gap-4 sm:gap-5 overflow-x-auto pb-1 snap-x snap-mandatory"
       >
+        {error && <p role="status" className="text-xs text-amber-300">Could not load creators: {error}</p>}
         {creators && creators.length > 0 ? (
           creators.map((singleCreator, index) => (
             <motion.div
@@ -49,7 +71,7 @@ export default function HomeCreators() {
             </motion.div>
           ))
         ) : (
-          <p className="text-zinc-500 text-sm pl-2">No creators found.</p>
+          <p className="text-zinc-500 text-sm pl-2">{error ? "Creators are unavailable until the feed can be loaded." : "No approved creators yet."}</p>
         )}
       </div>
     </motion.section>

@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 
 /* ─── section components ─── */
 import HomeHeroSection from "../Home/HomeHeroSection";
-import HomeDashboard from "../Home/HomeDashboard";
 import HomeVideoHub from "../Home/HomeVideoHub";
 import HomePulseFeed from "../Home/HomePulseFeedHub";
 import HomeGalleryHub from "../Home/HomeGalleryHub";
@@ -24,14 +23,11 @@ import {
    ============================================================ */
 export default function MainContent() {
   /* shared state lifted up for cross-section consistency */
-  const [heroPlaying, setHeroPlaying] = useState(true);
-  const [followingCreators, setFollowingCreators] = useState({});
   const [bookmarkedVideos, setBookmarkedVideos] = useState({});
   const [likedImages, setLikedImages] = useState({});
 
   const toggle = (setter) => (id) =>
     setter((prev) => ({ ...prev, [id]: !prev[id] }));
-  const toggleFollow = toggle(setFollowingCreators);
   const toggleBookmark = toggle(setBookmarkedVideos);
   const toggleLikeImage = toggle(setLikedImages);
 
@@ -88,13 +84,7 @@ export default function MainContent() {
 
       <div className="w-full mx-auto px-2 sm:px-3 lg:px-4 py-4 space-y-10 sm:space-y-10">
         {/* ============ HERO ============ */}
-        <HomeHeroSection
-          heroPlaying={heroPlaying}
-          setHeroPlaying={setHeroPlaying}
-        />
-
-        {/* ============ STATS DASHBOARD ============ */}
-        <HomeDashboard />
+        <HomeHeroSection />
 
 
         {/* ============ TRENDING VIDEOS ============ */}
@@ -144,4 +134,3 @@ export default function MainContent() {
     </motion.div>
   );
 }
-

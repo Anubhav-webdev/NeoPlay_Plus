@@ -13,9 +13,11 @@ import {
   toggleShowSignupPassword,
   toggleShowSignupConfirm,
   setIsSignupMode,
+  loginSuccess,
 } from "../../redux/slices/authSlice";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 /**
  * Reusable input field component with floating label logic
@@ -85,12 +87,36 @@ const LoginAndSignup = () => {
     return err;
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     const validation = validateLogin();
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      console.log("Processing login...", loginData);
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(loginData),
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.message || "Login failed");
+        const user = {
+          id: data.user._id || data.user.id,
+          name: data.user.name,
+          username: data.user.username,
+          email: data.user.email,
+          phone: data.user.phone,
+          role: data.user.role || "user",
+        };
+        sessionStorage.setItem("accessToken", data.accessToken);
+        localStorage.setItem("loggedInUser", JSON.stringify(user));
+        dispatch(loginSuccess(user));
+        dispatch(setLoginField({ name: "password", value: "" }));
+        navigate("/");
+      } catch (error) {
+        alert(error.message || "Server error, try again later");
+      }
     }
   };
 
@@ -104,6 +130,7 @@ const LoginAndSignup = () => {
         const res = await fetch(`${API_BASE_URL}/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             username: signupData.username,
             email: signupData.email,
@@ -121,9 +148,11 @@ const LoginAndSignup = () => {
         }
         
         if (!res.ok) return alert(data.message || "Signup failed");
+        sessionStorage.setItem("accessToken", data.accessToken);
         
         const newUser = { 
           id: data.user._id || data.user.id, 
+          name: data.user.name || signupData.username,
           username: data.user.username, 
           email: data.user.email, 
           phone: data.user.phone, 
@@ -131,6 +160,9 @@ const LoginAndSignup = () => {
         };
         
         localStorage.setItem("loggedInUser", JSON.stringify(newUser));
+        dispatch(loginSuccess(newUser));
+        dispatch(setSignupField({ name: "password", value: "" }));
+        dispatch(setSignupField({ name: "confirmPassword", value: "" }));
         alert("Account created successfully!");
         navigate("/");
       } catch { 

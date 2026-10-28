@@ -1,33 +1,52 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  Play,
-  Pause,
-  Eye,
-  Volume2,
-  Maximize2,
-  Settings,
-} from "lucide-react";
-import { VIDEOS } from "../../constants/data";
-import { C, FONT_DISPLAY  } from "./HomeConstants";
+import { Play } from "lucide-react";
+import { getPublishedContent } from "../../api/contentApi";
+import { C, FONT_DISPLAY } from "./HomeConstants";
 
-export default function HomeHeroSection({ heroPlaying, setHeroPlaying }) {
-  const featured = VIDEOS[0];
+export default function HomeHeroSection() {
+  const navigate = useNavigate();
+  const [featured, setFeatured] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPublishedContent("Video", { signal: controller.signal })
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        const item = items[0];
+        setFeatured(item ? {
+          id: item._id,
+          title: item.title,
+          description: item.description,
+          thumb: item.thumbnailUrl || item.mediaUrl,
+          views: item.viewCount || 0,
+        } : null);
+        setError("");
+      })
+      .catch((loadError) => {
+        if (loadError.name !== "AbortError") setError(loadError.message);
+      });
+    return () => controller.abort();
+  }, []);
 
   return (
     <motion.section
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative rounded-3xl overflow-hidden"
+      className="relative overflow-hidden rounded-3xl"
       style={{ border: `1px solid ${C.border}` }}
     >
-      <div className="relative min-h-[420px] sm:h-[480px] md:h-[520px] flex flex-col justify-end all-font">
-        <img
-          src={featured.thumb}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+      <div className="relative flex min-h-[420px] flex-col justify-end sm:h-[480px] md:h-[520px]">
+        {featured?.thumb && (
+          <img
+            src={featured.thumb}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{
@@ -36,31 +55,24 @@ export default function HomeHeroSection({ heroPlaying, setHeroPlaying }) {
           }}
         />
 
-        {/* top row */}
-        <div className="relative z-10 flex items-center justify-between px-5 sm:px-10 pt-6">
-          <div className="flex items-center gap-2.5">
-            <span
-              className="text-xs flex items-center gap-1.5"
-              style={{ color: C.muted }}
-            >
-              <Eye size={12} /> 48,209 watching
-            </span>
-          </div>
+        <div className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-10">
+          <span className="text-xs" style={{ color: C.muted }}>
+            {featured ? `${featured.views.toLocaleString()} views` : "Discover creator videos"}
+          </span>
           <span
             style={{ color: C.blue }}
-            className="text-xs tracking-[0.2em] uppercase hidden sm:inline"
+            className="hidden text-xs uppercase tracking-[0.2em] sm:inline"
           >
             NeoPlay+ Broadcast
           </span>
         </div>
 
-        {/* content */}
-        <div className="relative z-10 px-5 sm:px-10 pb-7 max-w-2xl">
+        <div className="relative z-10 max-w-2xl px-5 pb-10 sm:px-10">
           <span
-            className="text-xs sm:text-sm font-bold uppercase tracking-widest"
+            className="text-xs font-bold uppercase tracking-widest sm:text-sm"
             style={{ color: C.purple }}
           >
-            Channel 01 · Now Streaming
+            {featured ? "Featured video" : "Creator platform"}
           </span>
           <motion.h1
             initial={{ opacity: 0, x: -20 }}
@@ -71,106 +83,44 @@ export default function HomeHeroSection({ heroPlaying, setHeroPlaying }) {
               color: C.paper,
               letterSpacing: "0.01em",
             }}
-            className="text-4xl sm:text-6xl md:text-7xl leading-[0.95] mt-3"
+            className="mt-3 text-4xl leading-[0.95] sm:text-6xl md:text-7xl"
           >
-            Tune Into What The Internet Is Watching Right Now
+            {featured?.title || "Discover NeoPlay+"}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35, duration: 0.5 }}
-            className="mt-4 text-sm sm:text-base max-w-lg"
+            className="mt-4 max-w-lg text-sm sm:text-base"
             style={{ color: C.body }}
           >
-            One signal, every format. Videos, live chatter, and galleries from
-            creators worth following, all updating in real time.
+            {featured?.description || (error
+              ? "Published videos could not be loaded right now."
+              : "Videos, images, and conversations published by NeoPlay+ creators will appear here.")}
           </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.4 }}
-            className="flex flex-wrap gap-3 mt-6"
-          >
+          {error && <p role="status" className="mt-2 text-xs text-amber-300">Feed error: {error}</p>}
+          <div className="mt-6 flex flex-wrap gap-3">
             <button
-              className="px-6 py-3 sm:px-7 sm:py-3.5 rounded-xl font-bold flex items-center gap-2 transition-transform hover:scale-[1.02] cursor-pointer text-sm"
+              type="button"
+              disabled={!featured}
+              onClick={() => featured && navigate(`/video/${featured.id}`)}
+              className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:px-7 sm:py-3.5"
               style={{ backgroundColor: C.blue, color: C.ink }}
             >
-              <Play size={14} fill={C.ink} /> Watch {featured.title}
+              <Play size={14} fill={C.ink} />
+              {featured ? "Watch video" : "No featured video"}
             </button>
             <button
-              className="px-6 py-3 sm:px-7 sm:py-3.5 rounded-xl font-semibold transition-colors text-sm cursor-pointer"
+              type="button"
+              onClick={() => navigate("/videos")}
+              className="cursor-pointer rounded-xl px-6 py-3 text-sm font-semibold transition-colors sm:px-7 sm:py-3.5"
               style={{ border: `1px solid ${C.border}`, color: C.paper }}
             >
-              Browse Channels
+              Browse videos
             </button>
-          </motion.div>
-        </div>
-
-        {/* player chrome bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.4 }}
-          className="relative z-10 px-4 sm:px-6 pb-4 sm:pb-5"
-        >
-          <div
-            className="rounded-xl px-3 sm:px-4 py-2.5 flex items-center gap-3 sm:gap-4"
-            style={{
-              backgroundColor: "rgba(19,22,31,0.85)",
-              backdropFilter: "blur(6px)",
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <button
-              onClick={() => setHeroPlaying((p) => !p)}
-              className="cursor-pointer shrink-0"
-              aria-label={heroPlaying ? "Pause" : "Play"}
-            >
-              {heroPlaying ? (
-                <Pause size={16} color={C.paper} />
-              ) : (
-                <Play size={16} color={C.paper} />
-              )}
-            </button>
-            <span
-              className="text-[10px] sm:text-xs shrink-0"
-              style={{ color: C.muted }}
-            >
-              04:12
-            </span>
-            <div
-              className="flex-1 h-1.5 rounded-full overflow-hidden"
-              style={{ backgroundColor: C.border }}
-            >
-              <motion.div
-                className="h-full rounded-full"
-                style={{ backgroundColor: C.blue }}
-                initial={{ width: "0%" }}
-                animate={{ width: "38%" }}
-                transition={{ duration: 1, ease: "easeOut" }}
-              />
-            </div>
-            <span
-              className="text-[10px] sm:text-xs shrink-0"
-              style={{ color: C.mutedDark }}
-            >
-              {featured.duration}
-            </span>
-            <Volume2
-              size={15}
-              color={C.muted}
-              className="hidden sm:block shrink-0"
-            />
-            <Settings
-              size={15}
-              color={C.muted}
-              className="hidden sm:block shrink-0"
-            />
-            <Maximize2 size={15} color={C.muted} className="shrink-0" />
           </div>
-        </motion.div>
+        </div>
       </div>
     </motion.section>
   );
 }
-

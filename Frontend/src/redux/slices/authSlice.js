@@ -5,7 +5,8 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
  * Covers: LoginAndSignup, Navbar, Sidebar, Settings
  */
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 // Async thunk for signup
 export const signupUser = createAsyncThunk(
@@ -15,6 +16,7 @@ export const signupUser = createAsyncThunk(
       const res = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(userData),
       });
       const text = await res.text();
@@ -30,6 +32,7 @@ export const signupUser = createAsyncThunk(
 const initialState = {
   user: null,
   isAuthenticated: false,
+  initialized: false,
   loading: false,
   error: null,
   // Login form state
@@ -73,14 +76,17 @@ const authSlice = createSlice({
     loginSuccess: (state, action) => {
       state.user = action.payload;
       state.isAuthenticated = true;
+      state.initialized = true;
       state.error = null;
     },
     // Logout
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
+      state.initialized = true;
       state.loginData = { identifier: "", password: "" };
       localStorage.removeItem("loggedInUser");
+      sessionStorage.removeItem("accessToken");
     },
     // Clear error
     clearError: (state) => {
@@ -90,6 +96,7 @@ const authSlice = createSlice({
     restoreUser: (state, action) => {
       state.user = action.payload;
       state.isAuthenticated = !!action.payload;
+      state.initialized = true;
     },
   },
   extraReducers: (builder) => {
@@ -100,14 +107,19 @@ const authSlice = createSlice({
       })
       .addCase(signupUser.fulfilled, (state, action) => {
         state.loading = false;
+        if (action.payload.accessToken) {
+          sessionStorage.setItem("accessToken", action.payload.accessToken);
+        }
         state.user = {
           id: action.payload.user?._id || action.payload.user?.id,
+          name: action.payload.user?.name,
           username: action.payload.user?.username,
           email: action.payload.user?.email,
           phone: action.payload.user?.phone,
           role: action.payload.user?.role || "user",
         };
         state.isAuthenticated = true;
+        state.initialized = true;
         localStorage.setItem("loggedInUser", JSON.stringify(state.user));
       })
       .addCase(signupUser.rejected, (state, action) => {

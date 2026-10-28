@@ -7,23 +7,15 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   // Playlists array
-  playlists: [
-    { id: 1, name: 'Project References', description: 'UI patterns and demos worth revisiting.', visibility: 'private', count: 4 },
-    { id: 2, name: 'UI Inspirations', description: 'Public moodboard, shareable with the team.', visibility: 'public', count: 3 },
-  ],
-  activePlaylistId: 1,
+  playlists: [],
+  activePlaylistId: null,
   activeTab: 'media', // media | notes
 
   // Media items within playlists
-  mediaItems: [
-    { id: 1, playlistId: 1, type: 'video', title: "Big Buck Bunny", views: "10.3k", time: "44 minutes ago", channel: "Bunny", duration: "0:38", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/2519812/pexels-photo-2519812.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Cartoon" },
-    { id: 2, playlistId: 1, type: 'video', title: "Getting Started with Express.js", views: "11k", time: "5 hours ago", channel: "Express Learner", duration: "3:44", thumb: "https://images.pexels.com/photos/1739849/pexels-photo-1739849.jpeg?auto=compress&cs=tinysrgb&w=600", avatar: "https://images.pexels.com/photos/2519812/pexels-photo-2519812.jpeg?auto=compress&cs=tinysrgb&w=100", Catagory: "Education" },
-  ],
+  mediaItems: [],
 
   // Notes within playlists
-  notes: [
-    { id: 1, playlistId: 1, title: 'Kickoff prep', content: 'Topics to cover: goals, timeline, who owns what.', updatedAt: 'Jul 2' },
-  ],
+  notes: [],
 
   // Editing states
   editingPlaylistId: null,

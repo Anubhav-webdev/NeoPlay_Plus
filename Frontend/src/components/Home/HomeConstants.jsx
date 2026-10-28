@@ -27,8 +27,7 @@ export const FONT_DISPLAY = "'Bebas Neue', sans-serif";
 /* ============================================================
    TICKER DATA
    ============================================================ */
-export const TICKER_TOP = ["#TrendingNow","#NeoPlayPlus","#CreatorHub","#GamingLive","#MovieNight","#MusicWave","#TechTalk","#SportsCenter"];
-export const TICKER_BOTTOM = ["TRENDING POST · 125K INTERACTIONS","LIVE STREAM · 8.4K VIEWERS","NEW SHORT · VIRAL IN 12 COUNTRIES","CREATOR UPDATE · NEW SERIES ANNOUNCED","TOP COMMENT · COMMUNITY PICK","WATCH PARTY · STARTING NOW","EXCLUSIVE · NEO ORIGINALS", "FOR YOU · FRESH RECOMMENDATIONS"];
+export const TICKER_TOP = ["#TrendingNow","#NeoPlayPlus","#CreatorHub","#PulseFeed","#NeoShots","#MusicWave","#TechTalk","#SportsCenter"];
 
 /* ============================================================
    HOOKS

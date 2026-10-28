@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import {
+  getCreatorSubscriptionStatus,
+  setCreatorSubscribed,
+} from "../../api/subscriptionsApi";
 import { 
   FiThumbsUp, 
-  FiThumbsDown, 
   FiMoreVertical, 
   FiCheckCircle 
 } from "react-icons/fi";
 import { MdPlaylistAdd } from "react-icons/md"; 
 import { FaShareSquare } from "react-icons/fa";
+import { getContentLikeStatus, setContentLiked } from "../../api/likesApi";
 
 const confettiColors = ["#ff3b30", "#ffd60a", "#34c759", "#0a84ff", "#ff2d55", "#bf5af2", "#64d2ff"];
 const confettiPieces = Array.from({ length: 48 }, (_, index) => ({
@@ -19,11 +25,50 @@ const confettiPieces = Array.from({ length: 48 }, (_, index) => ({
 }));
 
 export default function VideoHeaderInfo({ video }) {
+  const user = useSelector((state) => state.auth.user);
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
-  const [isDisliked, setIsDisliked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likeError, setLikeError] = useState("");
+  const [isSavingLike, setIsSavingLike] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [subscriptionError, setSubscriptionError] = useState("");
+  const [isSavingSubscription, setIsSavingSubscription] = useState(false);
   const [showSubscriptionPopup, setShowSubscriptionPopup] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!video?.id) return undefined;
+    const controller = new AbortController();
+    getContentLikeStatus(video.id, { signal: controller.signal })
+      .then((status) => {
+        if (!controller.signal.aborted) {
+          setIsLiked(status.liked);
+          setLikeCount(status.likes);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setLikeError(error.message);
+      });
+    return () => controller.abort();
+  }, [video?.id, user]);
+
+  useEffect(() => {
+    if (!video?.creatorId || !user) return undefined;
+    const controller = new AbortController();
+    getCreatorSubscriptionStatus(video.creatorId, { signal: controller.signal })
+      .then((status) => {
+        if (!controller.signal.aborted) {
+          setIsSubscribed(status.subscribed);
+          setSubscriberCount(status.subscriberCount);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setSubscriptionError(error.message);
+      });
+    return () => controller.abort();
+  }, [video?.creatorId, user]);
 
   useEffect(() => {
     if (!showSubscriptionPopup) return undefined;
@@ -32,14 +77,42 @@ export default function VideoHeaderInfo({ video }) {
     return () => clearTimeout(timeoutId);
   }, [showSubscriptionPopup]);
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    if (isDisliked) setIsDisliked(false);
+  const handleLike = async () => {
+    if (!user) {
+      navigate("/signup");
+      return;
+    }
+    setIsSavingLike(true);
+    setLikeError("");
+    try {
+      const result = await setContentLiked(video.id, !isLiked);
+      setIsLiked(result.liked);
+      setLikeCount(result.likes);
+    } catch (error) {
+      setLikeError(error.message || "Could not update like.");
+    } finally {
+      setIsSavingLike(false);
+    }
   };
 
-  const handleDislike = () => {
-    setIsDisliked(!isDisliked);
-    if (isLiked) setIsLiked(false);
+  const handleSubscription = async () => {
+    if (!user) {
+      navigate("/signup");
+      return;
+    }
+    if (!video?.creatorId) return;
+    setIsSavingSubscription(true);
+    setSubscriptionError("");
+    try {
+      const result = await setCreatorSubscribed(video.creatorId, !isSubscribed);
+      setIsSubscribed(result.subscribed);
+      setSubscriberCount(result.subscriberCount);
+      if (result.subscribed) setShowSubscriptionPopup(true);
+    } catch (error) {
+      setSubscriptionError(error.message || "Could not update subscription.");
+    } finally {
+      setIsSavingSubscription(false);
+    }
   };
 
   return (
@@ -69,17 +142,14 @@ export default function VideoHeaderInfo({ video }) {
                 </span>
                 <FiCheckCircle className="h-4 w-4 shrink-0 text-[#3b7fe0]" />
               </div>
-              <span className="text-xs text-white/50">1.42M Subscribers</span>
+              <span className="text-xs text-white/50">{subscriberCount.toLocaleString()} subscribers</span>
             </div>
           </div>
 
           <div className="relative shrink-0">
             <button 
-              onClick={() => {
-                const nextSubscriptionState = !isSubscribed;
-                setIsSubscribed(nextSubscriptionState);
-                setShowSubscriptionPopup(nextSubscriptionState);
-              }}
+              onClick={handleSubscription}
+              disabled={isSavingSubscription || !video?.creatorId}
               className={`rounded-full px-5 py-2 text-xs font-bold transition-all active:scale-95 ${
                 isSubscribed 
                   ? "bg-white/10 text-white hover:bg-white/20" 
@@ -88,6 +158,7 @@ export default function VideoHeaderInfo({ video }) {
             >
               {isSubscribed ? "Subscribed" : "Subscribe"}
             </button>
+            {subscriptionError && <p role="alert" className="mt-1 text-xs text-red-300">{subscriptionError}</p>}
 
             {showSubscriptionPopup && (
               <div role="status" aria-live="polite" className="pointer-events-none absolute -inset-8 z-10">
@@ -118,27 +189,18 @@ export default function VideoHeaderInfo({ video }) {
           <div className="flex items-center rounded-full bg-white/5 border border-white/10 p-0.5 shrink-0">
             <button 
               onClick={handleLike}
+              disabled={isSavingLike}
               title="I like this"
               className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-l-full transition-colors ${
                 isLiked ? "text-[#3b7fe0] bg-white/10" : "text-white/80 hover:bg-white/10 hover:text-white"
               }`}
             >
               <FiThumbsUp className="h-4 w-4" />
-              <span>{video?.views ? "4.2K" : "24K"}</span>
+              <span>{likeCount}</span>
             </button>
             
-            <div className="h-4 w-px bg-white/10" />
-            
-            <button 
-              onClick={handleDislike}
-              title="I dislike this"
-              className={`px-3.5 py-1.5 rounded-r-full transition-colors ${
-                isDisliked ? "text-red-400 bg-white/10" : "text-white/70 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <FiThumbsDown className="h-4 w-4" />
-            </button>
           </div>
+          {likeError && <p role="alert" className="text-xs text-red-300">{likeError}</p>}
 
           {/* Share Button */}
           <button 
@@ -169,13 +231,13 @@ export default function VideoHeaderInfo({ video }) {
         className="rounded-2xl bg-white/5 border border-white/5 p-4 text-left transition-all duration-200 hover:bg-white/[0.07] cursor-pointer"
       >
         <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-          <span>{video?.views || "120K"} views</span>
+          <span>{(video?.views || 0).toLocaleString()} views</span>
           <span className="text-white/30">•</span>
-          <span>{video?.time || "2 days ago"}</span>
+          <span>{video?.time || ""}</span>
         </div>
         
         <p className={`mt-2 text-sm text-white/70 leading-relaxed max-w-3xl ${!isExpanded && "line-clamp-2"}`}>
-          System configuration output interface logs. Component maps trace internal routes to optimize video context trees across multi-view platform layouts.
+          {video?.description || "No description provided."}
         </p>
 
         <span className="mt-2 inline-block text-xs font-bold text-white/50 hover:text-white">

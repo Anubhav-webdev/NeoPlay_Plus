@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import TweetCard from "../Tweet/TweetCard";
-import { initialTweets } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 import {
   C,
   useHScroll,
@@ -10,6 +11,40 @@ import {
 
 export default function HomePulseFeed() {
   const [pulseRef, scrollPulse] = useHScroll();
+  const [tweets, setTweets] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPublishedContent("Tweet", { signal: controller.signal })
+      .then((items) => {
+        setTweets(items.map((item) => {
+          const name = item.creatorId?.displayName || "Creator";
+          return {
+            id: item._id,
+            creatorId: item.creatorId?._id,
+            name,
+            handle: name.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+            avatar: item.creatorId?.avatar || "",
+            verified: false,
+            time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
+            content: item.description || item.title,
+            likes: 0,
+            retweets: 0,
+            commentCount: item.commentCount || 0,
+            hasPreview: Boolean(item.mediaUrl),
+            mediaUrl: item.mediaUrl || "",
+            mediaType: item.mediaAssetId?.mediaType || "",
+            isBackendContent: true,
+          };
+        }));
+        setError("");
+      })
+      .catch((loadError) => {
+        if (loadError.name !== "AbortError") setError(loadError.message);
+      });
+    return () => controller.abort();
+  }, []);
 
   return (
     <motion.section
@@ -27,11 +62,14 @@ export default function HomePulseFeed() {
           accent={C.purple}
         />
       </div>
+      {error && <p role="status" className="mb-3 text-xs text-amber-300">Could not load posts: {error}</p>}
       <div
         ref={pulseRef}
         className="hide-scrollbar flex gap-4 overflow-x-auto pb-1 snap-x snap-mandatory"
       >
-        {initialTweets.map((tweet, idx) => (
+        {tweets.length === 0 ? (
+          <p className="py-8 text-sm text-zinc-500">{error ? "Posts are unavailable until the feed can be loaded." : "No published posts yet."}</p>
+        ) : tweets.map((tweet, idx) => (
           <motion.div
             key={tweet.id}
             initial={{ opacity: 0, y: 15 }}
@@ -47,4 +85,3 @@ export default function HomePulseFeed() {
     </motion.section>
   );
 }
-

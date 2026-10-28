@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
   FiGrid,
@@ -8,7 +8,7 @@ import {
   FiSliders,
 } from "react-icons/fi";
 import VideoCard from "./Videocard";
-import { VIDEOS } from "../../constants/data";
+import { getPublishedContent } from "../../api/contentApi";
 
 /* Redux Actions - contentSlice manages layout, category, sort, and refresh state */
 import {
@@ -18,18 +18,31 @@ import {
   setIsRefreshing,
 } from "../../redux/slices/contentSlice";
 
-// Compute unique categories dynamically from constant source data
-const CATEGORIES = [
-  "All",
-  ...new Set(VIDEOS.map((video) => video.category || video.Catagory)),
-];
-
 const SORT_OPTIONS = [
   { id: "newest", label: "Newest to Oldest" },
   { id: "oldest", label: "Oldest to Newest" },
   { id: "top-rated", label: "Top Rated" },
   { id: "most-viewed", label: "Most Viewed" },
 ];
+
+async function loadPublishedVideos(signal) {
+  const items = await getPublishedContent("Video", { signal });
+  return items.map((item) => ({
+    id: item._id,
+    title: item.title,
+    views: item.viewCount || 0,
+    time: item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "",
+    channel: item.creatorId?.displayName || "Creator",
+    avatar: item.creatorId?.avatar || "",
+    thumb: item.thumbnailUrl || item.mediaUrl,
+    src: item.mediaUrl,
+    duration: item.mediaAssetId?.metadata?.duration
+      ? `${Math.floor(item.mediaAssetId.metadata.duration / 60)}:${String(Math.floor(item.mediaAssetId.metadata.duration % 60)).padStart(2, "0")}`
+      : "",
+    category: item.categoryIds?.[0]?.name || "General",
+    createdAt: item.publishedAt || item.createdAt,
+  }));
+}
 
 export default function VideoGrid() {
   const dispatch = useDispatch();
@@ -38,8 +51,45 @@ export default function VideoGrid() {
   const { layout, activeCategory, sortBy, isRefreshing } = useSelector(
     (state) => state.content
   );
+  const [publishedVideos, setPublishedVideos] = useState([]);
+  const [feedError, setFeedError] = useState("");
 
-  const videos = useMemo(() => VIDEOS, []);
+  const refreshPublishedVideos = useCallback(async (signal) => {
+    try {
+      setPublishedVideos(await loadPublishedVideos(signal));
+      setFeedError("");
+    } catch (error) {
+      if (error.name !== "AbortError") setFeedError(error.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadPublishedVideos(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted) {
+          setPublishedVideos(items);
+          setFeedError("");
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && error.name !== "AbortError") {
+          setFeedError(error.message);
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  const videos = useMemo(
+    () => publishedVideos,
+    [publishedVideos],
+  );
+  const categories = useMemo(
+    () => ["All", ...new Set(videos.map((video) => video.category || video.Catagory).filter(Boolean))],
+    [videos],
+  );
 
   /* Filter and Sort logic executed memoized to prevent lag during re-renders */
   const filteredAndSortedVideos = useMemo(() => {
@@ -72,10 +122,10 @@ export default function VideoGrid() {
     });
   }, [activeCategory, sortBy, videos]);
 
-  /* Mock stream synchronization trigger */
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     dispatch(setIsRefreshing(true));
-    setTimeout(() => dispatch(setIsRefreshing(false)), 1000);
+    await refreshPublishedVideos();
+    dispatch(setIsRefreshing(false));
   };
 
   return (
@@ -99,7 +149,7 @@ export default function VideoGrid() {
 
           {/* Horizontal Category Pill Scrollbar */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 xl:pb-0 scrollbar-none snap-x">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => dispatch(setActiveCategory(cat))}
@@ -167,6 +217,11 @@ export default function VideoGrid() {
 
       {/* Main Video Presentation Stream Area */}
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 mt-8">
+        {feedError && (
+          <p role="status" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+            Could not refresh creator videos: {feedError}
+          </p>
+        )}
         {isRefreshing ? (
           /* Loading State Overlay View */
           <div className="flex flex-col items-center justify-center py-40">

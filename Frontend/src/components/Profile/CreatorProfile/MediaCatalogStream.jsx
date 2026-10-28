@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Search } from 'lucide-react';
 
@@ -11,7 +11,6 @@ const TABS = [
   { id: 'video', label: 'Video' },
   { id: 'image', label: 'Image' },
   { id: 'tweet', label: 'Tweet' },
-  { id: 'playlist', label: 'Playlist' },
 ];
 
 export default function MediaCatalogStream({ 
