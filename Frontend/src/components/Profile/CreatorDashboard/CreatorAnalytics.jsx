@@ -8,7 +8,7 @@ const metrics = [
   { key: "contentCount", label: "All content", icon: UserPlus, color: "text-green-400" },
 ];
 
-export default function MetricArchitecture({ analytics, onManageSubscriptions, isLoadingSubscriptions = false }) {
+export default function CreatorAnalytics({ analytics, onManageSubscriptions, isLoadingSubscriptions = false }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

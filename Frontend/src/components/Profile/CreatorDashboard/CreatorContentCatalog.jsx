@@ -7,7 +7,7 @@ import {
   VIDEO_UPLOAD_ACCEPT,
 } from "../../../constants/mediaTypes.js";
 
-export default function ContentCatalogStream({
+export default function CreatorContentCatalog({
   catalogTab, setCatalogTab, searchQuery, setSearchQuery, filteredCatalog,
   editingItemId, startEditingAsset, handleDeleteAsset, deletingContentId,
   handlePublishDraft, publishingContentId,
@@ -17,6 +17,10 @@ export default function ContentCatalogStream({
   saveEditedAsset, cancelEditingAsset, typeAccent
 }) {
   const thumbnailPreview = useFilePreviewUrl(editThumbnailFile);
+  const updateEditField = (field, value) => {
+    setEditFormState((current) => ({ ...current, [field]: value }));
+  };
+
   return (
     <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-[24px] shadow-2xl overflow-hidden">
       <div className="p-4 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -61,7 +65,6 @@ export default function ContentCatalogStream({
                         ) : asset.type === 'tweet' ? (
                           <div className={`flex h-full w-full items-center justify-center ${accent.bg} ${accent.text}`}><FiTwitter className="h-4 w-4" /></div>
                         ) : null}
-                        {asset.images && asset.images.length > 1 && <div className="absolute bottom-0 right-0 bg-slate-950/80 px-1 text-[8px] font-bold text-green-400 rounded-tl-md">+{asset.images.length}</div>}
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -72,8 +75,6 @@ export default function ContentCatalogStream({
                           <span className={`uppercase font-bold tracking-wider text-[9px] px-1.5 py-0.5 rounded ${accent.bg} ${accent.text}`}>{asset.category}</span><span>{asset.views.toLocaleString()} Impr.</span>
                           {asset.status === 'draft' ? (
                             <span className="text-amber-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Draft</span>
-                          ) : asset.isSubscriberOnly ? (
-                            <span className="text-red-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Premium</span>
                           ) : (
                             <span className="text-green-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" /> Public</span>
                           )}
@@ -98,22 +99,22 @@ export default function ContentCatalogStream({
                       <div>
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">{editFormState.type === 'tweet' ? 'Tweet stream' : 'Title'}</label>
                         {editFormState.type === 'tweet' ? (
-                          <textarea value={editFormState.title || ''} onChange={(e) => setEditFormState({ ...editFormState, title: e.target.value })} className="w-full bg-slate-900 border border-slate-800 text-xs p-2.5 rounded-lg text-white h-20 resize-none focus:outline-none focus:border-purple-500" />
+                          <textarea value={editFormState.title || ''} onChange={(e) => updateEditField('title', e.target.value)} className="w-full bg-slate-900 border border-slate-800 text-xs p-2.5 rounded-lg text-white h-20 resize-none focus:outline-none focus:border-purple-500" />
                         ) : (
-                          <input type="text" value={editFormState.title || ''} onChange={(e) => setEditFormState({ ...editFormState, title: e.target.value })} className="w-full bg-slate-900 border border-slate-800 text-xs p-2.5 rounded-lg text-white focus:outline-none focus:border-purple-500" />
+                          <input type="text" value={editFormState.title || ''} onChange={(e) => updateEditField('title', e.target.value)} className="w-full bg-slate-900 border border-slate-800 text-xs p-2.5 rounded-lg text-white focus:outline-none focus:border-purple-500" />
                         )}
                       </div>
 
                       {editFormState.type !== 'tweet' && (
                         <div>
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
-                          <textarea value={editFormState.description || ''} maxLength={5000} onChange={(e) => setEditFormState({ ...editFormState, description: e.target.value })} className="mb-3 h-20 w-full resize-y rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none" />
+                          <textarea value={editFormState.description || ''} maxLength={5000} onChange={(e) => updateEditField('description', e.target.value)} className="mb-3 h-20 w-full resize-y rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none" />
                         </div>
                       )}
                       {editFormState.type !== 'tweet' && (
                         <div>
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
-                          <select value={editFormState.categoryId || ''} onChange={(e) => setEditFormState({ ...editFormState, categoryId: e.target.value })} disabled={isSavingEdit} className="mb-3 w-full rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none">
+                          <select value={editFormState.categoryId || ''} onChange={(e) => updateEditField('categoryId', e.target.value)} disabled={isSavingEdit} className="mb-3 w-full rounded-lg border border-slate-800 bg-slate-900 p-2.5 text-xs text-white focus:border-purple-500 focus:outline-none">
                             <option value="">Uncategorized</option>
                             {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
                           </select>

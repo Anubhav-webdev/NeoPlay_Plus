@@ -15,8 +15,8 @@ export default function UploadContentForm({
   setFormTitle,
   formDescription,
   setFormDescription,
-  uploadedFilesArray,
-  setUploadedFilesArray,
+  mediaFile,
+  setMediaFile,
   thumbnailFile,
   setThumbnailFile,
   resetThumbnailUploadState,
@@ -34,7 +34,7 @@ export default function UploadContentForm({
 
   const handleTypeTabSwitch = (type) => {
     setContentType(type);
-    setUploadedFilesArray([]);
+    setMediaFile(null);
     setThumbnailFile(null);
     resetMediaUploadState();
     resetThumbnailUploadState();
@@ -44,7 +44,7 @@ export default function UploadContentForm({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (file) {
-      setUploadedFilesArray([file]);
+      setMediaFile(file);
       resetMediaUploadState();
     }
   };
@@ -64,7 +64,7 @@ export default function UploadContentForm({
     : contentType === "image"
       ? IMAGE_UPLOAD_ACCEPT
       : MEDIA_UPLOAD_ACCEPT;
-  const selectedFile = uploadedFilesArray[0];
+  const selectedFile = mediaFile;
 
   return (
     <div className="relative rounded-[24px] border border-slate-800/60 bg-slate-900/40 p-6 shadow-2xl backdrop-blur-xl">

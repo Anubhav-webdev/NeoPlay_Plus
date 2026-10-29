@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Edit2, Sliders, UploadCloud } from 'lucide-react';
 
-export default function IdentitySuite({ 
+export default function CreatorIdentity({
   channelIdentity, 
   setChannelIdentity, 
   isEditingProfileText, 
@@ -13,6 +13,11 @@ export default function IdentitySuite({
   isSavingProfile = false,
   isUploadingProfileImage = false,
 }) {
+  const updateField = (field) => (event) => {
+    const { value } = event.target;
+    setChannelIdentity((current) => ({ ...current, [field]: value }));
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 15 }}
@@ -69,17 +74,17 @@ export default function IdentitySuite({
           <div className="pt-2 sm:pt-6">
             {isEditingProfileText ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 max-w-sm">
-                <input type="text" value={channelIdentity.name} onChange={(e) => setChannelIdentity({ ...channelIdentity, name: e.target.value })} className="bg-slate-950 border border-slate-800 text-sm px-3 py-1.5 rounded-xl text-white w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Creator Name" />
+                <input type="text" value={channelIdentity.name} maxLength={100} onChange={updateField('name')} className="bg-slate-950 border border-slate-800 text-sm px-3 py-1.5 rounded-xl text-white w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Creator Name" />
                 <input type="text" value={channelIdentity.username} readOnly className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-500 w-full focus:outline-none" aria-label="Account handle" />
-                <input type="text" maxLength={160} value={channelIdentity.tagline} onChange={(e) => setChannelIdentity({ ...channelIdentity, tagline: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-purple-400 w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Tagline" />
-                <textarea maxLength={2000} value={channelIdentity.about} onChange={(e) => setChannelIdentity({ ...channelIdentity, about: e.target.value })} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-400 w-full focus:outline-none focus:border-purple-500 transition-colors resize-none h-16" placeholder="About" />
+                <input type="text" maxLength={160} value={channelIdentity.tagline} onChange={updateField('tagline')} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-purple-400 w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Tagline" />
+                <textarea maxLength={2000} value={channelIdentity.about} onChange={updateField('about')} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-400 w-full focus:outline-none focus:border-purple-500 transition-colors resize-none h-16" placeholder="About" />
                 <button type="button" onClick={onSaveProfile} disabled={isSavingProfile || isUploadingProfileImage} className="bg-purple-600 hover:bg-purple-500 px-4 py-1.5 text-[10px] uppercase tracking-widest font-black text-white rounded-xl transition-all disabled:opacity-60">{isSavingProfile ? "Saving..." : "Save Profile"}</button>
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <div className="flex items-center gap-2">
                   <h2 className="text-2xl font-extrabold text-white sidebar-font tracking-wider">{channelIdentity.name}</h2>
-                  {channelIdentity.isVerified && <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] px-2 py-0.5 font-bold uppercase rounded-md tracking-widest">Creator</span>}
+                  <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] px-2 py-0.5 font-bold uppercase rounded-md tracking-widest">Creator</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">{channelIdentity.username}</p>
                 <p className="text-xs text-slate-300 mt-2 max-w-xl leading-relaxed">{channelIdentity.about}</p>
