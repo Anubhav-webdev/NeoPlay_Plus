@@ -16,7 +16,7 @@ export const getCreatorAnalytics = asyncHandler(async (req, res) => {
     });
   const [counts, subscriberCount] = await Promise.all([
     Content.aggregate([
-      { $match: { creatorId: creator._id } },
+      { $match: { creatorId: creator._id, status: { $ne: "archived" } } },
       {
         $group: {
           _id: null,

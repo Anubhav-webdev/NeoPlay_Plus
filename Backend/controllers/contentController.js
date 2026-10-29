@@ -125,6 +125,7 @@ export const listMyContent = asyncHandler(async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate("categoryIds", "name slug")
+      .populate("mediaAssetId", "mediaType")
       .populate("thumbnailAssetId", "secureUrl"),
     Content.countDocuments({ creatorId: creator._id, status: { $ne: "archived" } }),
   ]);

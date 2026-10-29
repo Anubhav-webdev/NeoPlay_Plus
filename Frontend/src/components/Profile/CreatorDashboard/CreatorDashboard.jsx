@@ -11,10 +11,12 @@ import MetricArchitecture from '../../Profile/CreatorDashboard/CreatorAnalytics'
 import UploadContentForm from '../../Profile/CreatorDashboard/UploadContentForm';
 import ContentCatalogStream from '../../Profile/CreatorDashboard/ContentCatalogStream';
 import DiagnosticMatrix from '../../Profile/CreatorDashboard/DiagnosticMatrix';
+import RegistryModals from '../../Profile/CreatorDashboard/RegistryModals';
 import {
   addCommentReply,
   getMyCreatorComments,
 } from '../../../api/commentsApi';
+import { getMySubscriptions, setCreatorSubscribed } from '../../../api/subscriptionsApi';
 import {
   archiveContent,
   publishContentRecord,
@@ -52,7 +54,7 @@ function CreatorStudio({ creator, user }) {
     about: creator.about || "",
     username: user.username ? `@${user.username}` : "",
     isVerified: true,
-    avatar: creator.avatar || "",
+    avatar: creator.avatar || user.avatar || "",
     wallpaper: creator.banner || "",
   });
   const [isEditingProfileText, setIsEditingProfileText] = useState(false);
@@ -62,8 +64,9 @@ function CreatorStudio({ creator, user }) {
   const wallpaperInputRef = useRef(null);
 
   // Data Arrays
-  const [followers] = useState([]);
   const [following, setFollowing] = useState([]);
+  const [isLoadingFollowing, setIsLoadingFollowing] = useState(false);
+  const [unsubscribingCreatorId, setUnsubscribingCreatorId] = useState(null);
 
   // Form Pipeline Pipeline States
   const [contentType, setContentType] = useState('video');
@@ -80,6 +83,7 @@ function CreatorStudio({ creator, user }) {
   const [uploadStatus, setUploadStatus] = useState('');
   const [pendingUploadId, setPendingUploadId] = useState(null);
   const [verifiedMediaAssetId, setVerifiedMediaAssetId] = useState(null);
+  const [verifiedMediaType, setVerifiedMediaType] = useState(null);
   const [editMediaFile, setEditMediaFile] = useState(null);
   const [editThumbnailFile, setEditThumbnailFile] = useState(null);
   const [editThumbnailPendingUploadId, setEditThumbnailPendingUploadId] = useState(null);
@@ -126,6 +130,7 @@ function CreatorStudio({ creator, user }) {
             thumbnailAssetId: content.thumbnailAssetId?._id || content.thumbnailAssetId || '',
             isSubscriberOnly: false,
             mediaUrl: content.mediaUrl || '',
+            mediaType: content.mediaAssetId?.mediaType || (type === 'video' || type === 'image' ? type : null),
             thumbnail: type === 'video'
               ? content.thumbnailUrl || ''
               : content.thumbnailUrl || content.mediaUrl || '',
@@ -157,17 +162,20 @@ function CreatorStudio({ creator, user }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([
-      getMyCreatorAnalytics({ signal: controller.signal }),
-      getMyCreatorComments({ signal: controller.signal }),
-    ])
-      .then(([creatorAnalytics, creatorComments]) => {
+    getMyCreatorAnalytics({ signal: controller.signal })
+      .then((creatorAnalytics) => {
+        if (!controller.signal.aborted) setAnalytics(creatorAnalytics);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          showToast(error.message || "Could not load creator analytics.", "red");
+        }
+      });
+    getMyCreatorComments({ signal: controller.signal })
+      .then((creatorComments) => {
         if (controller.signal.aborted) return;
-        setAnalytics(creatorAnalytics);
+        const currentUserId = String(user.id || user._id || "");
         setComments(creatorComments.map((comment) => {
-          const ownReplies = comment.replies?.filter((reply) =>
-            String(reply.userId?._id || reply.userId) === String(user.id || user._id)
-          ) || [];
           const author = comment.userId || {};
           return {
             id: comment._id,
@@ -177,23 +185,58 @@ function CreatorStudio({ creator, user }) {
             avatar: author.avatar || "",
             text: comment.text,
             assetTitle: comment.contentId?.title || "Published content",
-            replyText: ownReplies.at(-1)?.text || "",
-            replyAvatar: ownReplies.at(-1)?.userId?.avatar || creator.avatar || "",
+            replies: (comment.replies || []).map((reply) => ({
+              ...reply,
+              isCreatorReply:
+                String(reply.userId?._id || reply.userId || "") === currentUserId,
+            })),
           };
         }));
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
-          showToast(error.message || "Could not load creator analytics and comments.", "red");
+          showToast(error.message || "Could not load creator comments.", "red");
         }
       });
     return () => controller.abort();
   }, [showToast, user]);
 
-  const handleUnfollowTarget = (id) => {
-    if (window.confirm("Remove this connection?")) {
-      setFollowing(following.filter(item => item.id !== id));
-      showToast("Connection removed", "red");
+  useEffect(() => () => window.clearTimeout(toastTimerRef.current), []);
+
+  const handleOpenSubscriptions = async () => {
+    setActiveModal('following');
+    setIsLoadingFollowing(true);
+    try {
+      const subscriptions = await getMySubscriptions();
+      setFollowing(subscriptions.map((subscription) => {
+        const channel = subscription.creatorId || {};
+        return {
+          id: channel._id,
+          name: channel.displayName || 'Creator',
+          avatar: channel.avatar || '',
+        };
+      }).filter((channel) => channel.id));
+    } catch (error) {
+      setFollowing([]);
+      setActiveModal(null);
+      showToast(error.message || 'Could not load your subscriptions.', 'red');
+    } finally {
+      setIsLoadingFollowing(false);
+    }
+  };
+
+  const handleUnfollowTarget = async (id) => {
+    if (!id || unsubscribingCreatorId) return;
+    if (!window.confirm('Unsubscribe from this creator?')) return;
+    setUnsubscribingCreatorId(id);
+    try {
+      await setCreatorSubscribed(id, false);
+      setFollowing((current) => current.filter((item) => String(item.id) !== String(id)));
+      showToast('Unsubscribed from creator.', 'green');
+    } catch (error) {
+      showToast(error.message || 'Could not update your subscription.', 'red');
+    } finally {
+      setUnsubscribingCreatorId(null);
     }
   };
 
@@ -243,11 +286,14 @@ function CreatorStudio({ creator, user }) {
   };
   const handlePublishAsset = async (e) => {
     e.preventDefault();
+    const selectedMediaFile = uploadedFilesArray[0] instanceof File
+      ? uploadedFilesArray[0]
+      : null;
     if (!formTitle.trim()) return showToast("A title or post text is required.", "red");
     if (contentType !== 'tweet' && formDescription.length > 5000) {
       return showToast("Description must be 5,000 characters or fewer.", "red");
     }
-    if (contentType !== 'tweet' && !(uploadedFilesArray[0] instanceof File)) {
+    if (contentType !== 'tweet' && !selectedMediaFile) {
       return showToast("Select a local image or video file first.", "red");
     }
     if (contentType === 'video' && !(thumbnailFile instanceof File)) {
@@ -256,24 +302,40 @@ function CreatorStudio({ creator, user }) {
 
     setIsPublishing(true);
     setUploadStatus('Preparing upload');
+    let failedUploadKind = null;
     try {
       let mediaAssetId = verifiedMediaAssetId;
-      if (!mediaAssetId && uploadedFilesArray[0] instanceof File) {
+      if (!mediaAssetId && selectedMediaFile) {
         let uploadId = pendingUploadId;
         if (!uploadId) {
-          const queuedUpload = await uploadMedia(uploadedFilesArray[0]);
+          const queuedUpload = await uploadMedia(selectedMediaFile);
           uploadId = queuedUpload.uploadId;
           setPendingUploadId(uploadId);
         }
         setUploadStatus('Checking for exact and similar media');
+        failedUploadKind = 'media';
         const verifiedUpload = await waitForMediaUpload(uploadId, setUploadStatus);
+        failedUploadKind = null;
         if (verifiedUpload.reviewPending) {
           throw new Error("Possible duplicate: this upload is waiting for moderator review.");
         }
+        const expectedMediaType = contentType === 'video'
+          ? 'video'
+          : contentType === 'image'
+            ? 'image'
+            : null;
+        if (expectedMediaType && verifiedUpload.mediaType !== expectedMediaType) {
+          throw new Error(`Choose a supported ${expectedMediaType} file for this post.`);
+        }
         mediaAssetId = verifiedUpload._id;
         setVerifiedMediaAssetId(mediaAssetId);
+        setVerifiedMediaType(verifiedUpload.mediaType || null);
         setPendingUploadId(null);
       }
+
+      const attachmentMediaType = verifiedMediaType || (selectedMediaFile
+        ? (selectedMediaFile.type.startsWith('video/') ? 'video' : 'image')
+        : null);
 
       let thumbnailAssetId = null;
       if (contentType === 'video' && thumbnailFile) {
@@ -286,7 +348,9 @@ function CreatorStudio({ creator, user }) {
             setPendingThumbnailUploadId(uploadId);
           }
           setUploadStatus('Verifying video thumbnail');
+          failedUploadKind = 'thumbnail';
           const verifiedUpload = await waitForMediaUpload(uploadId, setUploadStatus);
+          failedUploadKind = null;
           if (verifiedUpload.reviewPending) {
             throw new Error("The thumbnail is waiting for duplicate review. Try again after review.");
           }
@@ -327,8 +391,16 @@ function CreatorStudio({ creator, user }) {
         category: categories.find((category) => category._id === selectedCategoryId)?.name || '',
         isSubscriberOnly: false,
         mediaUrl: content.mediaUrl || '',
-        thumbnail: content.thumbnailUrl || (contentType === 'image' ? content.mediaUrl : ''),
-        images: contentType === 'image' ? [content.mediaUrl] : [],
+        mediaType: contentType === 'tweet' ? attachmentMediaType : contentType,
+        thumbnail: content.thumbnailUrl || (
+          contentType === 'image' || (contentType === 'tweet' && attachmentMediaType === 'image')
+            ? content.mediaUrl
+            : ''
+        ),
+        images: (contentType === 'image' || (contentType === 'tweet' && attachmentMediaType === 'image'))
+          && content.mediaUrl
+          ? [content.mediaUrl]
+          : [],
       };
 
       setContentCatalog((items) => [newAsset, ...items.filter((item) => item.id !== newAsset.id)]);
@@ -336,6 +408,7 @@ function CreatorStudio({ creator, user }) {
       setFormDescription('');
       setUploadedFilesArray([]);
       setVerifiedMediaAssetId(null);
+      setVerifiedMediaType(null);
       setPendingUploadId(null);
       setThumbnailFile(null);
       setVerifiedThumbnailAssetId(null);
@@ -345,10 +418,14 @@ function CreatorStudio({ creator, user }) {
       showToast(publishMode === 'public' ? "Content published." : "Draft saved.", "green");
     } catch (error) {
       if (["duplicate", "failed"].includes(error.uploadStatus)) {
-        setPendingUploadId(null);
-        setVerifiedMediaAssetId(null);
-        setPendingThumbnailUploadId(null);
-        setVerifiedThumbnailAssetId(null);
+        if (failedUploadKind === 'thumbnail') {
+          setPendingThumbnailUploadId(null);
+          setVerifiedThumbnailAssetId(null);
+        } else {
+          setPendingUploadId(null);
+          setVerifiedMediaAssetId(null);
+          setVerifiedMediaType(null);
+        }
       }
       setUploadStatus('');
       showToast(error.message || "Content upload failed.", "red");
@@ -359,6 +436,7 @@ function CreatorStudio({ creator, user }) {
 
   const resetMediaUploadState = () => {
     setVerifiedMediaAssetId(null);
+    setVerifiedMediaType(null);
     setPendingUploadId(null);
   };
 
@@ -541,15 +619,22 @@ function CreatorStudio({ creator, user }) {
   };
 
   const submitReplyToComment = async (commentId, replyString) => {
-    if (!replyString.trim()) return;
+    if (!replyString.trim()) return false;
     try {
       const reply = await addCommentReply(commentId, replyString.trim());
       setComments((current) => current.map((comment) => (
-        comment.id === commentId ? { ...comment, replyText: reply.text } : comment
+        comment.id === commentId
+          ? {
+            ...comment,
+            replies: [...(comment.replies || []), { ...reply, isCreatorReply: true }],
+          }
+          : comment
       )));
       showToast("Reply posted.", "blue");
+      return true;
     } catch (error) {
       showToast(error.message || "Could not post reply.", "red");
+      return false;
     }
   };
 
@@ -619,6 +704,8 @@ function CreatorStudio({ creator, user }) {
 
         <MetricArchitecture 
           analytics={analytics}
+          onManageSubscriptions={handleOpenSubscriptions}
+          isLoadingSubscriptions={isLoadingFollowing}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -663,13 +750,19 @@ function CreatorStudio({ creator, user }) {
         </div>
 
         <DiagnosticMatrix 
-          creatorAvatar={channelIdentity.avatar}
           commentTab={commentTab} setCommentTab={setCommentTab}
           filteredComments={filteredComments} submitReplyToComment={submitReplyToComment}
         />
 
       </div>
 
+      <RegistryModals 
+        activeModal={activeModal} setActiveModal={setActiveModal}
+        following={following}
+        isLoadingFollowing={isLoadingFollowing}
+        unsubscribingCreatorId={unsubscribingCreatorId}
+        handleUnfollowTarget={handleUnfollowTarget}
+      />
     </div>
   );
 }
@@ -683,6 +776,7 @@ export default function CreatorDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [creatorProfileUnavailable, setCreatorProfileUnavailable] = useState(false);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -692,6 +786,7 @@ export default function CreatorDashboard() {
         if (controller.signal.aborted) return;
         setCreator(profile);
         setError('');
+        setCreatorProfileUnavailable(false);
         if (profile?.applicationStatus === 'approved' && user.role !== 'creator') {
           const updatedUser = { ...user, role: 'creator' };
           localStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
@@ -699,7 +794,10 @@ export default function CreatorDashboard() {
         }
       })
       .catch((loadError) => {
-        if (!controller.signal.aborted) setError(loadError.message || 'Could not load creator status.');
+        if (!controller.signal.aborted) {
+          setCreatorProfileUnavailable(true);
+          setError(loadError.message || 'Could not load creator status.');
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -713,6 +811,23 @@ export default function CreatorDashboard() {
   if (!user) return <Navigate to="/signup" replace />;
   if (loading) {
     return <main className="mx-auto max-w-3xl p-8 text-center text-slate-300">Loading creator account...</main>;
+  }
+  if (creatorProfileUnavailable && !creator) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-12 text-white">
+        <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-6 sm:p-8">
+          <h1 className="text-xl font-bold">Could not load your creator status</h1>
+          <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>
+          <button
+            type="button"
+            onClick={() => { setCreatorProfileUnavailable(false); setLoading(true); setRefreshKey((key) => key + 1); }}
+            className="mt-5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold hover:bg-cyan-500"
+          >
+            Retry
+          </button>
+        </section>
+      </main>
+    );
   }
   if (creator?.applicationStatus === 'approved') return <CreatorStudio creator={creator} user={user} />;
 

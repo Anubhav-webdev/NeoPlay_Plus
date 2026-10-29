@@ -1,56 +1,71 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
-export default function RegistryModals({ activeModal, setActiveModal, followers, following, handleUnfollowTarget }) {
+export default function RegistryModals({
+  activeModal,
+  setActiveModal,
+  following,
+  isLoadingFollowing,
+  unsubscribingCreatorId,
+  handleUnfollowTarget,
+}) {
   return (
     <AnimatePresence>
-      {activeModal === 'followers' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setActiveModal(null)} className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} onClick={(e) => e.stopPropagation()} className="bg-slate-900 border border-slate-800 rounded-[28px] p-6 w-full max-w-md shadow-2xl relative">
-            <button onClick={() => setActiveModal(null)} className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Followers </h3>
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {followers.map(f => (
-                <div key={f.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-850 hover:border-purple-500/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <img src={f.avatar} alt="Visualization" className="w-8 h-8 rounded-xl border border-slate-800 bg-slate-900" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-200">{f.name}</p>
-                      <p className="text-[12px] text-slate-500">{f.handle}</p>
-                    </div>
-                  </div>
-                  <span className="text-[8px] font-bold uppercase tracking-widest bg-slate-900 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded">Following</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-
       {activeModal === 'following' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setActiveModal(null)} className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} onClick={(e) => e.stopPropagation()} className="bg-slate-900 border border-slate-800 rounded-[28px] p-6 w-full max-w-md shadow-2xl relative">
-            <button onClick={() => setActiveModal(null)} className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Connection Subscriptions</h3>
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {following.length === 0 ? (
-                <p className="text-xs text-slate-600 uppercase font-bold text-center py-6 tracking-wide">No remaining active channels followed.</p>
-              ) : (
-                following.map(f => (
-                  <div key={f.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-850 hover:border-cyan-500/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <img src={f.avatar} alt="Identity Visualization" className="w-8 h-8 rounded-xl border border-slate-800 bg-slate-900" />
-                      <div>
-                        <p className="text-xs font-bold text-slate-200">{f.name}</p>
-                        <p className="text-[12px] text-slate-500">{f.handle}</p>
-                      </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setActiveModal(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            onClick={(event) => event.stopPropagation()}
+            className="relative w-full max-w-md rounded-[28px] border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+          >
+            <button
+              type="button"
+              onClick={() => setActiveModal(null)}
+              aria-label="Close subscriptions"
+              className="absolute right-5 top-5 text-slate-500 transition-colors hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-300">Your subscriptions</h3>
+
+            {isLoadingFollowing ? (
+              <p role="status" className="py-6 text-center text-xs text-slate-400">Loading your subscriptions...</p>
+            ) : following.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-500">You are not subscribed to any creators yet.</p>
+            ) : (
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                {following.map((channel) => (
+                  <div key={channel.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 transition-colors hover:border-cyan-500/30">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {channel.avatar ? (
+                        <img src={channel.avatar} alt={`${channel.name} profile photo`} className="h-9 w-9 flex-shrink-0 rounded-xl border border-slate-800 object-cover" />
+                      ) : (
+                        <span aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-xs font-bold text-slate-300">
+                          {channel.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <p className="truncate text-xs font-bold text-slate-200">{channel.name}</p>
                     </div>
-                    <button onClick={() => handleUnfollowTarget(f.id)} className="px-3 py-1 bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-500/50 text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-red-400 transition-all rounded-lg">Unfollow</button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnfollowTarget(channel.id)}
+                      disabled={Boolean(unsubscribingCreatorId)}
+                      className="flex-shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-400 transition-all hover:border-red-500/50 hover:bg-red-950/40 hover:text-red-300 disabled:cursor-wait disabled:opacity-50"
+                    >
+                      {String(unsubscribingCreatorId) === String(channel.id) ? 'Saving...' : 'Unsubscribe'}
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

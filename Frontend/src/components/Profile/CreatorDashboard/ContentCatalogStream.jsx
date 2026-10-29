@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Video, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud, Send } from 'lucide-react';
+import { Search, Video, Image as ImageIcon, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud, Send } from 'lucide-react';
 import { FiTwitter } from 'react-icons/fi';
+import useFilePreviewUrl from "./useFilePreviewUrl.js";
 import {
   IMAGE_UPLOAD_ACCEPT,
   VIDEO_UPLOAD_ACCEPT,
@@ -16,16 +16,7 @@ export default function ContentCatalogStream({
   editThumbnailFile, handleEditThumbnailFileChange, categories = [],
   saveEditedAsset, cancelEditingAsset, typeAccent
 }) {
-  const [thumbnailPreview, setThumbnailPreview] = useState('');
-  useEffect(() => {
-    if (!editThumbnailFile) {
-      setThumbnailPreview('');
-      return undefined;
-    }
-    const objectUrl = URL.createObjectURL(editThumbnailFile);
-    setThumbnailPreview(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [editThumbnailFile]);
+  const thumbnailPreview = useFilePreviewUrl(editThumbnailFile);
   return (
     <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-[24px] shadow-2xl overflow-hidden">
       <div className="p-4 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -58,8 +49,18 @@ export default function ContentCatalogStream({
                     <div className="flex-1 flex gap-4 items-start min-w-0">
                       <div className={`w-20 h-12 bg-slate-950 border ${accent.border} rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden relative shadow-inner`}>
                         {asset.type === 'video' && (asset.thumbnail ? <img src={asset.thumbnail} alt={asset.title + ' thumbnail'} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-500"><Video className="w-4 h-4" /></div>)}
-                        {asset.type === 'image' && <img src={asset.mediaUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=60"} alt="Visual" className="w-full h-full object-cover" />}
-                        {asset.type === 'tweet' && <div className={`w-full h-full ${accent.bg} flex items-center justify-center ${accent.text}`}><FiTwitter className="w-4 h-4" /></div>}
+                        {asset.type === 'image' && (asset.mediaUrl ? (
+                          <img src={asset.mediaUrl} alt={asset.title + ' image'} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className={`flex h-full w-full items-center justify-center ${accent.bg} ${accent.text}`}><ImageIcon className="h-4 w-4" /></div>
+                        ))}
+                        {asset.type === 'tweet' && asset.mediaType === 'image' && asset.mediaUrl ? (
+                          <img src={asset.mediaUrl} alt="Post attachment" className="h-full w-full object-cover" />
+                        ) : asset.type === 'tweet' && asset.mediaType === 'video' ? (
+                          <div className={`flex h-full w-full items-center justify-center ${accent.bg} ${accent.text}`}><Video className="h-4 w-4" /></div>
+                        ) : asset.type === 'tweet' ? (
+                          <div className={`flex h-full w-full items-center justify-center ${accent.bg} ${accent.text}`}><FiTwitter className="h-4 w-4" /></div>
+                        ) : null}
                         {asset.images && asset.images.length > 1 && <div className="absolute bottom-0 right-0 bg-slate-950/80 px-1 text-[8px] font-bold text-green-400 rounded-tl-md">+{asset.images.length}</div>}
                       </div>
 

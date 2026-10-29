@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Edit2, Sliders, UploadCloud } from 'lucide-react';
 
@@ -23,15 +22,22 @@ export default function IdentitySuite({
     >
       {/* Wallpaper Media Slot */}
       <div className="h-40 sm:h-52 w-full relative group bg-transparent overflow-hidden">
-        <img src={channelIdentity.wallpaper} alt="Studio Banner" className="w-full h-full object-cover opacity-50 transition-transform duration-700 group-hover:scale-105" />
+        {channelIdentity.wallpaper ? (
+          <img src={channelIdentity.wallpaper} alt="Creator channel banner" className="h-full w-full object-cover opacity-50 transition-transform duration-700 group-hover:scale-105" />
+        ) : (
+          <div aria-hidden="true" className="h-full w-full bg-gradient-to-br from-purple-950 via-slate-900 to-cyan-950" />
+        )}
         <div className="absolute inset-0 " />
-        <div 
-          className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center cursor-pointer" 
-          onClick={() => !isUploadingProfileImage && wallpaperInputRef.current?.click()}
+        <button
+          type="button"
+          aria-label="Change creator channel banner"
+          disabled={isUploadingProfileImage}
+          className="absolute inset-0 flex cursor-pointer items-center justify-center bg-slate-950/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100 disabled:cursor-wait"
+          onClick={() => wallpaperInputRef.current?.click()}
         >
           <Sliders className="w-5 h-5 text-purple-400 mr-2" />
           <span className="text-xs font-bold uppercase tracking-widest text-white">{isUploadingProfileImage ? "Saving profile image..." : "Modify Studio Wallpaper"}</span>
-        </div>
+        </button>
         <input type="file" ref={wallpaperInputRef} accept="image/jpeg,image/png,image/webp" disabled={isUploadingProfileImage} onChange={(e) => executeProfileImageUpload(e, "wallpaper")} className="hidden" />
       </div>
 
@@ -40,13 +46,22 @@ export default function IdentitySuite({
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
           <div className="relative group z-10">
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[24px] overflow-hidden border-4 border-slate-950 bg-slate-900 shadow-2xl relative ring-2 ring-purple-500/20 transition-all duration-300 group-hover:ring-purple-500/60">
-              <img src={channelIdentity.avatar} alt="Avatar Node" className="w-full h-full object-cover" />
-              <div 
-                className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center cursor-pointer" 
-                onClick={() => !isUploadingProfileImage && avatarInputRef.current?.click()}
+              {channelIdentity.avatar ? (
+                <img src={channelIdentity.avatar} alt="Creator profile photo" className="h-full w-full object-cover" />
+              ) : (
+                <div aria-hidden="true" className="flex h-full w-full items-center justify-center text-2xl font-bold text-slate-400">
+                  {(channelIdentity.name || 'C').trim().charAt(0).toUpperCase()}
+                </div>
+              )}
+              <button
+                type="button"
+                aria-label="Change creator profile photo"
+                disabled={isUploadingProfileImage}
+                className="absolute inset-0 flex cursor-pointer items-center justify-center bg-slate-950/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100 disabled:cursor-wait"
+                onClick={() => avatarInputRef.current?.click()}
               >
                 <UploadCloud className="w-5 h-5 text-white" />
-              </div>
+              </button>
             </div>
             <input type="file" ref={avatarInputRef} accept="image/jpeg,image/png,image/webp" disabled={isUploadingProfileImage} onChange={(e) => executeProfileImageUpload(e, "avatar")} className="hidden" />
           </div>

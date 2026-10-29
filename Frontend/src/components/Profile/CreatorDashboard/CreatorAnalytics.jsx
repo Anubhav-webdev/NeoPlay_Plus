@@ -8,24 +8,36 @@ const metrics = [
   { key: "contentCount", label: "All content", icon: UserPlus, color: "text-green-400" },
 ];
 
-export default function MetricArchitecture({ analytics }) {
+export default function MetricArchitecture({ analytics, onManageSubscriptions, isLoadingSubscriptions = false }) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {metrics.map(({ key, label, icon: Icon, color }) => (
-        <motion.div
-          key={key}
-          whileHover={{ y: -4 }}
-          className="rounded-[24px] border border-slate-800/60 bg-slate-900/40 p-6 text-white shadow-xl"
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {metrics.map(({ key, label, icon: Icon, color }) => (
+          <motion.div
+            key={key}
+            whileHover={{ y: -4 }}
+            className="rounded-[24px] border border-slate-800/60 bg-slate-900/40 p-6 text-white shadow-xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</span>
+              <Icon className={`h-4 w-4 ${color}`} />
+            </div>
+            <div className="text-xl font-bold tracking-tight sm:text-2xl">
+              {analytics ? Number(analytics[key] || 0).toLocaleString() : '—'}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onManageSubscriptions}
+          disabled={isLoadingSubscriptions}
+          className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:border-cyan-500/50 hover:text-cyan-300 disabled:cursor-wait disabled:opacity-60"
         >
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</span>
-            <Icon className={`h-4 w-4 ${color}`} />
-          </div>
-          <div className="text-xl font-bold tracking-tight sm:text-2xl">
-            {(analytics?.[key] || 0).toLocaleString()}
-          </div>
-        </motion.div>
-      ))}
+          {isLoadingSubscriptions ? 'Loading subscriptions...' : 'Manage subscriptions'}
+        </button>
+      </div>
     </div>
   );
 }

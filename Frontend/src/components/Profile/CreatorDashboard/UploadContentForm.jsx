@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { UploadCloud, Video, Image as ImageIcon } from "lucide-react";
 import { FiTwitter } from "react-icons/fi";
+import useFilePreviewUrl from "./useFilePreviewUrl.js";
 import {
   IMAGE_UPLOAD_ACCEPT,
   MEDIA_UPLOAD_ACCEPT,
@@ -30,17 +30,7 @@ export default function UploadContentForm({
   isPublishing,
   uploadStatus,
 }) {
-  const [thumbnailPreview, setThumbnailPreview] = useState("");
-
-  useEffect(() => {
-    if (!thumbnailFile) {
-      setThumbnailPreview("");
-      return undefined;
-    }
-    const objectUrl = URL.createObjectURL(thumbnailFile);
-    setThumbnailPreview(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [thumbnailFile]);
+  const thumbnailPreview = useFilePreviewUrl(thumbnailFile);
 
   const handleTypeTabSwitch = (type) => {
     setContentType(type);
