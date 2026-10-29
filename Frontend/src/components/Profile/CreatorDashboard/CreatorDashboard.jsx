@@ -11,7 +11,6 @@ import MetricArchitecture from '../../Profile/CreatorDashboard/CreatorAnalytics'
 import UploadContentForm from '../../Profile/CreatorDashboard/UploadContentForm';
 import ContentCatalogStream from '../../Profile/CreatorDashboard/ContentCatalogStream';
 import DiagnosticMatrix from '../../Profile/CreatorDashboard/DiagnosticMatrix';
-import RegistryModals from '../../Profile/CreatorDashboard/RegistryModals';
 import {
   addCommentReply,
   getMyCreatorComments,
@@ -671,11 +670,6 @@ function CreatorStudio({ creator, user }) {
 
       </div>
 
-      <RegistryModals 
-        activeModal={activeModal} setActiveModal={setActiveModal}
-        followers={followers} following={following}
-        handleUnfollowTarget={handleUnfollowTarget}
-      />
     </div>
   );
 }

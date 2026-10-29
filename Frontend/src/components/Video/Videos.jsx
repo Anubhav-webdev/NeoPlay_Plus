@@ -1,27 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
-  FiGrid,
   FiVideo,
-  FiRefreshCw,
-  FiLayers,
   FiSliders,
 } from "react-icons/fi";
 import VideoCard from "./Videocard";
 import { getPublishedContent } from "../../api/contentApi";
 
-/* Redux Actions - contentSlice manages layout, category, sort, and refresh state */
+/* Redux Actions - contentSlice manages category, sort, and refresh state */
 import {
   setActiveCategory,
   setSortBy,
-  setLayout,
-  setIsRefreshing,
+
 } from "../../redux/slices/contentSlice";
 
 const SORT_OPTIONS = [
   { id: "newest", label: "Newest to Oldest" },
   { id: "oldest", label: "Oldest to Newest" },
-  { id: "top-rated", label: "Top Rated" },
   { id: "most-viewed", label: "Most Viewed" },
 ];
 
@@ -48,20 +43,11 @@ export default function VideoGrid() {
   const dispatch = useDispatch();
 
   /* Extract visual state values from Redux */
-  const { layout, activeCategory, sortBy, isRefreshing } = useSelector(
+  const { activeCategory, sortBy, isRefreshing } = useSelector(
     (state) => state.content
   );
   const [publishedVideos, setPublishedVideos] = useState([]);
   const [feedError, setFeedError] = useState("");
-
-  const refreshPublishedVideos = useCallback(async (signal) => {
-    try {
-      setPublishedVideos(await loadPublishedVideos(signal));
-      setFeedError("");
-    } catch (error) {
-      if (error.name !== "AbortError") setFeedError(error.message);
-    }
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,6 +72,7 @@ export default function VideoGrid() {
     () => publishedVideos,
     [publishedVideos],
   );
+  
   const categories = useMemo(
     () => ["All", ...new Set(videos.map((video) => video.category || video.Catagory).filter(Boolean))],
     [videos],
@@ -112,8 +99,6 @@ export default function VideoGrid() {
             new Date(a.uploadDate || a.createdAt) -
             new Date(b.uploadDate || b.createdAt)
           );
-        case "top-rated":
-          return (b.rating || 0) - (a.rating || 0);
         case "most-viewed":
           return (b.views || 0) - (a.views || 0);
         default:
@@ -122,17 +107,9 @@ export default function VideoGrid() {
     });
   }, [activeCategory, sortBy, videos]);
 
-  const handleRefresh = async () => {
-    dispatch(setIsRefreshing(true));
-    await refreshPublishedVideos();
-    dispatch(setIsRefreshing(false));
-  };
-
   return (
     <section className="relative w-full min-w-0 bg-transparent text-slate-100 overflow-hidden">
-      {/* Decorative background ambient glows */}
-     
-
+      
       {/* Sticky Top Filter & Control Panel */}
       <div className="sticky top-0 z-30 backdrop-blur-md bg-transparent border-b border-white/[0.06] transition-all duration-300">
         <div className="px-6 py-5 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between max-w-[1600px] mx-auto">
@@ -164,7 +141,7 @@ export default function VideoGrid() {
             ))}
           </div>
 
-          {/* Sorting and Grid System Layout Controls */}
+          {/* Sorting Control */}
           <div className="flex items-center gap-3 flex-wrap justify-between xl:justify-end">
             <div className="relative flex items-center rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 transition-all duration-300 hover:border-cyan-500/40">
               <FiSliders className="text-xs text-cyan-400 mr-2" />
@@ -180,40 +157,10 @@ export default function VideoGrid() {
                 ))}
               </select>
             </div>
-
-            <div className="flex rounded-xl p-1 bg-black/40 border border-white/[0.08] backdrop-blur-md items-center">
-              {[
-                { id: "grid", icon: <FiGrid /> },
-                { id: "dense", icon: <FiLayers /> },
-              ].map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => dispatch(setLayout(mode.id))}
-                  className={`p-2.5 rounded-lg text-sm transition-all duration-300 ${
-                    layout === mode.id
-                      ? "bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg"
-                      : "text-gray-400 hover:text-white hover:bg-white/[0.05]"
-                  }`}
-                  title={`${mode.id.toUpperCase()} VIEW`}
-                >
-                  {mode.icon}
-                </button>
-              ))}
-              
-              <button
-                key="refresh-btn"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="p-2.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/[0.05] transition-all duration-300 disabled:opacity-50"
-                title="SYNC FEED"
-              >
-                <FiRefreshCw className={`${isRefreshing ? "animate-spin text-cyan-400" : ""}`} />
-              </button>
-            </div>
           </div>
 
         </div>
-      </div> {/* Fixed: Added missing closing tag for sticky header container wrapper */}
+      </div>
 
       {/* Main Video Presentation Stream Area */}
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 mt-8">
@@ -222,6 +169,7 @@ export default function VideoGrid() {
             Could not refresh creator videos: {feedError}
           </p>
         )}
+        
         {isRefreshing ? (
           /* Loading State Overlay View */
           <div className="flex flex-col items-center justify-center py-40">
@@ -243,32 +191,14 @@ export default function VideoGrid() {
             </p>
           </div>
         ) : (
-          /* Active Interactive Render Stream Blocks */
-          <>
-            {/* Standard Grid Mode Layout */}
-            {layout === "grid" && (
-              <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
-                {filteredAndSortedVideos.map((video) => (
-                  <div key={video.id}>
-                    <VideoCard video={video} />
-                  </div>
-                ))}
+          /* Active Interactive Render Stream Grid */
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
+            {filteredAndSortedVideos.map((video) => (
+              <div key={video.id}>
+                <VideoCard video={video} />
               </div>
-            )}
-            
-            {/* High Density Compact Mode Layout */}
-            {layout === "dense" && (
-              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                {filteredAndSortedVideos.map((video) => (
-                  <div key={video.id}>
-                    <div className="scale-95 group-hover:scale-100 transition-transform duration-300 rounded-lg overflow-hidden">
-                      <VideoCard video={video} />
-                    </div>
-                  </div> /* Fixed: Added missing closing div tag for video loop node wrapper */
-                ))}
-              </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </div>
     </section>

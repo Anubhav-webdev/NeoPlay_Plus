@@ -6,8 +6,9 @@ import {
   FiHome, FiTrendingUp, FiTv, FiPlayCircle, 
   FiImage, FiTwitter, FiList,
   FiClock, FiSettings, FiHelpCircle, 
-  FiFlag, FiLogOut,FiDownload,FiUsers ,FiMusic
+  FiFlag, FiLogOut
 } from "react-icons/fi";
+import { FiMusic, FiDownload,FiUsers } from "react-icons/fi";
 
 function SidebarLink({ item, expanded, isActive, badge,badgeColor, dot, onClose , disabled }) {
   const content = (
@@ -106,17 +107,17 @@ export function Sidebar({ mobileOpen, expanded, onClose, onMouseEnter, onMouseLe
         <SidebarLink item={{ label: "NeoVideos", icon: <FiPlayCircle />, to: "/videos" }} expanded={expanded} isActive={checkActive("/videos")} />
         <SidebarLink item={{ label: "NeoShots", icon: <FiImage />, to: "/images" }} expanded={expanded} isActive={checkActive("/images")} />
         <SidebarLink item={{ label: "NeoFeed", icon: <FiTwitter />, to: "/tweets-feed" }} expanded={expanded} isActive={checkActive("/tweets-feed")} dot={true} />
-        <SidebarLink item={{ label: "NeoMusic", icon: <FiMusic />, to: "/music" }} expanded={expanded} isActive={checkActive("/music")} badge="Upcoming..." badgeColor="red-500" disabled={true} />
+        {/* <SidebarLink item={{ label: "NeoMusic", icon: <FiMusic />, to: "/music" }} expanded={expanded} isActive={checkActive("/music")} badge="Upcoming..." badgeColor="red-500" disabled={true} /> */}
         
         <hr className="border-slate-500/40 my-1.5 mx-1" />
 
         {/* USER ARCHIVE ITEMS */}
         <SidebarLink item={{ label: "Playlists", icon: <FiList />, to: "/playlists" }} expanded={expanded} isActive={checkActive("/playlists")} />
-        <SidebarLink item={{ label: "Download", icon: <FiDownload />, to: "/download" }} expanded={expanded} isActive={checkActive("/download")}  disabled={true} />
+        {/* <SidebarLink item={{ label: "Download", icon: <FiDownload />, to: "/download" }} expanded={expanded} isActive={checkActive("/download")}  disabled={true} /> */}
         <SidebarLink item={{ label: "Watch History", icon: <FiClock />, to: "/watch-history" }} expanded={expanded} isActive={checkActive("/watch-history")} />
 
         <hr className="border-slate-500/40 my-1.5 mx-1" />
-        <SidebarLink item={{ label: "Community Zone", icon: <FiUsers />, to: "/community" }} expanded={expanded} isActive={checkActive("/community")} badge="Upcoming..." badgeColor="red-500"  disabled={true} />
+        {/* <SidebarLink item={{ label: "Community Zone", icon: <FiUsers />, to: "/community" }} expanded={expanded} isActive={checkActive("/community")} badge="Upcoming..." badgeColor="red-500"  disabled={true} /> */}
         {isAuthenticated && <SidebarLink item={{ label: user.role === "creator" ? "Creator Dashboard" : "Become a Creator", icon: <FiTv />, to: "/creator-dashboard" }} expanded={expanded} isActive={checkActive("/creator-dashboard")} badge={user.role === "creator" ? "Studio" : undefined} badgeColor="teal-500" onClose={onClose} />}
         {isAdmin && <SidebarLink item={{ label: "Duplicate Reviews", icon: <FiFlag />, to: "/admin/media-reviews" }} expanded={expanded} isActive={checkActive("/admin/media-reviews")} badge="Admin" badgeColor="amber-500" />}
       </nav>
@@ -132,3 +133,6 @@ export function Sidebar({ mobileOpen, expanded, onClose, onMouseEnter, onMouseLe
     </aside>
   );
 }
+
+
+//three features post poned (29.10.2026)

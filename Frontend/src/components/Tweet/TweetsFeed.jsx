@@ -17,10 +17,9 @@ export default function TweetsFeed() {
   const [showMediaOnly, setShowMediaOnly] = useState(false);
   const [publishedTweets, setPublishedTweets] = useState([]);
   const [feedError, setFeedError] = useState("");
-  
-  // Track user premium verification status
-  const [isSubscribed, setIsSubscribed] = useState(false);
 
+
+  
   useEffect(() => {
     const controller = new AbortController();
     getPublishedContent("Tweet", { signal: controller.signal })
@@ -133,44 +132,6 @@ export default function TweetsFeed() {
             </div>
           </div>
 
-          {/* Conditional Rendering: Composer tool displays ONLY when subscribed */}
-          {isSubscribed ? (
-            <div className="p-4 border-b border-zinc-800 flex space-x-3 bg-gradient-to-b from-blue-950/10 to-transparent transition-all duration-500 animate-fadeIn">
-              <div className="w-10 h-10 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-blue-500/20">
-                PRO
-              </div>
-              <div className="flex-1">
-                <textarea 
-                  rows={2}
-                  placeholder="What's happening? Post your updates..." 
-                  className="w-full bg-transparent text-lg text-zinc-200 placeholder-zinc-600 outline-none resize-none pt-1"
-                />
-                <div className="flex justify-between items-center pt-3 mt-2 border-t border-zinc-900">
-                  <div className="flex space-x-3.5 text-blue-400 text-base cursor-pointer">
-                    <span className="hover:text-blue-300 transition">🖼️</span>
-                    <span className="hover:text-blue-300 transition">📹</span>
-                    <span className="hover:text-blue-300 transition">📊</span>
-                    <span className="hover:text-blue-300 transition">😀</span>
-                  </div>
-                  <button className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-1.5 rounded-full text-sm font-bold transition shadow-md shadow-blue-500/10">
-                    Post
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="p-5 border-b border-zinc-800 bg-zinc-950/40 text-center flex flex-col items-center justify-center space-y-2">
-              <p className="text-sm text-zinc-400 font-medium">
-                Want to join the conversation and publish your thoughts?
-              </p>
-              <button 
-                onClick={() => setIsSubscribed(true)}
-                className="text-xs bg-transparent hover:bg-zinc-800 border border-zinc-700 text-blue-400 font-semibold px-3 py-1.5 rounded-full transition"
-              >
-                Unlock Post Option via Premium
-              </button>
-            </div>
-          )}
 
           {/* Active Post/Feed Stream */}
           <div className="flex flex-col ">
@@ -208,26 +169,7 @@ export default function TweetsFeed() {
             </div>
           </div>
 
-          {/* Premium Subscription Card Widget */}
-          <div className="bg-transparent border border-zinc-800 rounded-2xl p-4 space-y-2">
-            <h2 className="text-xl font-extrabold tracking-tight">
-              {isSubscribed ? "You are Premium! ✨" : "Subscribe to Premium"}
-            </h2>
-            <p className="text-sm text-zinc-400 leading-snug">
-              {isSubscribed 
-                ? "Enjoy full posting features, analytics dashboard tools, and ad-free experience layout permissions."
-                : "Get rid of ads, unlock the tweet posting composer engine, see your analytics, and upgrade parameters."
-              }
-            </p>
-            {!isSubscribed && (
-              <button 
-                onClick={() => setIsSubscribed(true)}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm px-4 py-2 rounded-full transition w-fit mt-1"
-              >
-                Subscribe
-              </button>
-            )}
-          </div>
+     
 
           {/* NEW: Today's Weather Widget */}
           <div className="bg-transparent border border-zinc-800 rounded-2xl p-4 space-y-3">

@@ -55,7 +55,6 @@ export default function PlaylistDashboard() {
   const [error, setError] = useState("");
   const userId = user?._id || user?.id;
   const loading = Boolean(user && loadedUserId !== userId);
-  const [availableContent, setAvailableContent] = useState([]);
   const [selectedContentId, setSelectedContentId] = useState("");
   const [showAddContent, setShowAddContent] = useState(false);
 
@@ -196,20 +195,6 @@ export default function PlaylistDashboard() {
     }
   };
 
-  const openAddContent = async () => {
-    if (showAddContent) {
-      setShowAddContent(false);
-      return;
-    }
-    try {
-      setAvailableContent(await getPublishedContent());
-      setSelectedContentId("");
-      setShowAddContent(true);
-      setError("");
-    } catch (requestError) {
-      setError(requestError.message);
-    }
-  };
 
   const addContent = async () => {
     if (!selectedContentId || !activePlaylistId) return;
@@ -332,27 +317,10 @@ export default function PlaylistDashboard() {
           ) : activeTab === "media" ? (
             <>
               <div className="mb-4 flex justify-end">
-                <button
-                  onClick={openAddContent}
-                  className="rounded-lg bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-500"
-                >
-                  {showAddContent ? "Cancel" : "Add published content"}
-                </button>
               </div>
               {showAddContent && (
                 <div className="mb-5 flex flex-col gap-2 rounded-xl border border-white/10 p-4 sm:flex-row">
-                  <select
-                    value={selectedContentId}
-                    onChange={(event) => setSelectedContentId(event.target.value)}
-                    className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white"
-                  >
-                    <option value="">Choose published content</option>
-                    {availableContent
-                      .filter((item) => !activePlaylist.items.some((saved) => saved.id === item._id))
-                      .map((item) => (
-                        <option key={item._id} value={item._id}>{item.title}</option>
-                      ))}
-                  </select>
+                
                   <button
                     onClick={addContent}
                     disabled={!selectedContentId}

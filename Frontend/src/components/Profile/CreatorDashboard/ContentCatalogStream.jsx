@@ -68,7 +68,7 @@ export default function ContentCatalogStream({
                         {asset.description && <p className="mt-1 line-clamp-1 text-[10px] text-slate-500">{asset.description}</p>}
                         <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-400 font-medium flex-wrap">
                           <span className={`uppercase font-bold tracking-wider text-[9px] px-1.5 py-0.5 rounded ${accent.bg} ${accent.text}`}>{asset.type}</span>
-                          <span>•</span><span>{asset.category}</span><span>•</span><span>{asset.views.toLocaleString()} Impr.</span><span>•</span>
+                          <span className={`uppercase font-bold tracking-wider text-[9px] px-1.5 py-0.5 rounded ${accent.bg} ${accent.text}`}>{asset.category}</span><span>{asset.views.toLocaleString()} Impr.</span>
                           {asset.status === 'draft' ? (
                             <span className="text-amber-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Draft</span>
                           ) : asset.isSubscriberOnly ? (
@@ -153,8 +153,8 @@ export default function ContentCatalogStream({
                       )}
 
                       <div className="flex gap-2 pt-2">
-                        <button onClick={saveEditedAsset} disabled={isSavingEdit} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all disabled:cursor-wait disabled:opacity-60"><Save className="w-3.5 h-3.5" /> {isSavingEdit ? 'Saving...' : 'Save Changes'}</button>
-                        <button onClick={cancelEditingAsset} disabled={isSavingEdit} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all disabled:opacity-60"><Ban className="w-3.5 h-3.5" /> Cancel Modification</button>
+                        <button onClick={saveEditedAsset} disabled={isSavingEdit} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all disabled:cursor-wait disabled:opacity-60"><Save className="w-3.5 h-3.5" /> {isSavingEdit ? 'Saving...' : 'Save'}</button>
+                        <button onClick={cancelEditingAsset} disabled={isSavingEdit} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 text-[10px] px-4 py-2 font-bold uppercase tracking-wider rounded-xl transition-all disabled:opacity-60"><Ban className="w-3.5 h-3.5" /> Discard</button>
                       </div>
                     </motion.div>
                   )}
