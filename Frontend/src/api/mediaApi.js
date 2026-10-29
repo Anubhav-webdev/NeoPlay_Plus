@@ -97,15 +97,16 @@ export async function getMyCreatorAnalytics({ signal } = {}) {
   return result.data;
 }
 
-export async function applyAsCreator(displayName) {
+export async function applyAsCreator(payload) {
+  const body = typeof payload === "string" ? { displayName: payload } : payload;
+
   const result = await apiFetch("/creators/apply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ displayName }),
+    body: JSON.stringify(body),
   });
   return result.data.creator;
 }
-
 export async function uploadMedia(file) {
   const formData = new FormData();
   formData.append("file", file);

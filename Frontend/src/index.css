@@ -2,6 +2,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Lobster+Two:ital@1&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Splash&display=swap');
 
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 :root {
   color-scheme: dark;
   --neo-bg: #070B14;
@@ -17,18 +19,25 @@
   --neo-shadow: 0 24px 90px rgba(0, 0, 0, 0.35);
 }
 
+
+/* Cinematic titles */
 .title-font {
   font-family: "Bebas Neue", sans-serif;
 }
 
+/* Clean sidebar navigation */
 .sidebar-font {
-  font-family: "Lobster Two", cursive;
+  font-family: "Lobster Two", sans-serif;
 }
+
+/* Main application typography */
 .all-font {
-  font-family: "Roboto",
+  font-family: "Inter", sans-serif;
 }
+
+/* Modern NeoPlay+ branding and headings */
 .header-font {
-  font-family: "Orbitron", "Lobster Two";
+  font-family: "Space Grotesk", sans-serif;
 }
 
 @import "tailwindcss";

@@ -187,31 +187,6 @@ export default function WatchHistory({
     );
   };
 
-  const deleteSelected = async () => {
-    if (window.confirm(`Delete ${selectedIds.length} selected items?`)) {
-      const selected = history.filter((item) => selectedIds.includes(item.id));
-      const results = await Promise.allSettled(
-        selected.map((item) => {
-          if (!item.isBackendContent || !user) return Promise.resolve();
-          return activeTab === "watchLater"
-            ? removeFromWishlist(item.contentId)
-            : deleteWatchHistoryItem(item.contentId);
-        })
-      );
-      const removed = new Set(
-        selected.filter((_, index) => results[index].status === "fulfilled").map((item) => item.id)
-      );
-      setHistory((prev) =>
-        prev.map((item) =>
-          removed.has(item.id)
-            ? { ...item, inWatchHistory: false, inWatchLater: activeTab === "watchLater" ? false : item.inWatchLater }
-            : item
-        ).filter((item) => item.inWatchLater || item.inWatchHistory)
-      );
-      setSelectedIds([]);
-    }
-  };
-
   const getDateGroupLabel = (dateString) => {
     if (!dateString) return "Older";
     const videoDate = new Date(dateString);
@@ -334,29 +309,6 @@ export default function WatchHistory({
             ))}
           </div>
 
-          {/* Batch Action Bar */}
-          {selectedIds.length > 0 && (
-            <div className="bg-cyan-950/30 border border-cyan-500/30 p-3.5 rounded-xl flex items-center justify-between backdrop-blur-md">
-              <span className="text-xs font-mono font-semibold text-cyan-200">
-                {selectedIds.length} item(s) selected
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={deleteSelected}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-xs font-semibold text-white transition-all shadow-lg shadow-rose-900/30"
-                >
-                  <FiTrash2 /> Remove
-                </button>
-                <button
-                  onClick={() => setSelectedIds([])}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Content States */}
           {historyError && <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{historyError}</p>}
           
@@ -412,13 +364,7 @@ export default function WatchHistory({
 
                         <div className="p-3.5 flex items-center justify-between bg-[#0D121B] border-t border-white/5 mt-auto">
                           <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              aria-label={`Select ${video.title}`}
-                              checked={selectedIds.includes(video.id)}
-                              onChange={() => toggleSelect(video.id)}
-                              className="accent-cyan-500 rounded cursor-pointer w-4 h-4"
-                            />
+                      
                             <span className="text-[11px] font-mono text-slate-400">{video.progress}% watched</span>
                           </div>
 

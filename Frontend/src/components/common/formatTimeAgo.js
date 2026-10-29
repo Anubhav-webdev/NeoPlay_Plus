@@ -1,23 +1,24 @@
 /**
- * Formats a given date or timestamp string into a relative time string (e.g., "3d ago", "2h ago").
- * @param {string | Date} dateInput - The date, timestamp, or string to format.
- * @returns {string} - The formatted relative time string.
+ * Formats a date into a relative time string.
+ * @param {string | Date | number} dateInput
+ * @returns {string}
  */
 export function formatTimeAgo(dateInput) {
   if (!dateInput) return "";
-  const date = new Date(dateInput);
-  if (isNaN(date.getTime())) return dateInput; // fallback if already a string like "2 hours ago"
 
-  const seconds = Math.floor((new Date() - date) / 1000);
-  let interval = seconds / 31536000;
-  if (interval > 1) return Math.floor(interval) + "y ago";
-  interval = seconds / 2592000;
-  if (interval > 1) return Math.floor(interval) + "mo ago";
-  interval = seconds / 86400;
-  if (interval > 1) return Math.floor(interval) + "d ago";
-  interval = seconds / 3600;
-  if (interval > 1) return Math.floor(interval) + "h ago";
-  interval = seconds / 60;
-  if (interval > 1) return Math.floor(interval) + "m ago";
-  return "Just now";
+  const date = new Date(dateInput);
+
+  if (isNaN(date.getTime())) {
+    return typeof dateInput === "string" ? dateInput : "";
+  }
+
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 0) return "Just now";
+
+  if (seconds < 60) return "Just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
+  if (seconds < 31536000) return `${Math.floor(seconds / 2592000)}mo ago`;
+  return `${Math.floor(seconds / 31536000)}y ago`;
 }
