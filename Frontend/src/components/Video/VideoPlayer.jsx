@@ -1,19 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VIDEOS } from "../../constants/data";
-import BunnyVideo from "../../photo&Video/BunnyVideo.mp4";
-import AnotherVideo from "../../photo&Video/AnotherVideo.mp4";
 import {
   Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX,
   Maximize, Minimize, Repeat, Gauge, PictureInPicture2,
-  Camera, Clapperboard, Bookmark, ChevronRight,
+  Camera, Clapperboard, Bookmark,
   MoreVertical, Download
 } from 'lucide-react';
 
-const DEMO_PLAYLIST = [BunnyVideo, AnotherVideo];
-
 export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress }) {
-  const resolvedVideo = video || VIDEOS[0];
+  const resolvedVideo = video || null;
   
   // ── Player Core States ───────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -36,7 +31,6 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
   const [isPiP, setIsPiP] = useState(false);
   const [snapshotUrl, setSnapshotUrl] = useState(null);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [videoIndex, setVideoIndex] = useState(0);
 
   // ── Player Elements Refs ──────────────────────────────────────────
   const playerContainerRef = useRef(null);
@@ -47,8 +41,7 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
   const canvasRef = useRef(null);
   const lastProgressSaveRef = useRef(0);
 
-  const totalTracksCount = resolvedVideo?.src ? VIDEOS.length : DEMO_PLAYLIST.length;
-  const videoSrc = resolvedVideo?.src ?? DEMO_PLAYLIST[videoIndex];
+  const videoSrc = typeof resolvedVideo?.src === 'string' ? resolvedVideo.src : '';
 
   useEffect(() => {
     lastProgressSaveRef.current = 0;
@@ -66,15 +59,6 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
     setControlsVisible(true);
     hideControlsTimeout();
   };
-
-  // ── Playlist Navigation ──────────────────────────────────────────
-  const playNext = useCallback(() => {
-    setVideoIndex(next => (next + 1) % totalTracksCount);
-  }, [totalTracksCount]);
-
-  const playPrev = useCallback(() => {
-    setVideoIndex(prev => (prev - 1 + totalTracksCount) % totalTracksCount);
-  }, [totalTracksCount]);
 
   // ── Unified Playback Toggle ──────────────────────────────────────
   const handleTogglePlay = useCallback(() => {
@@ -126,8 +110,9 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
-    
-    videoEl.src = videoSrc;
+    videoEl.pause();
+    if (videoSrc) videoEl.src = videoSrc;
+    else videoEl.removeAttribute('src');
     videoEl.load();
     setCurrentTime(0);
     setDuration(0);
@@ -304,7 +289,7 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
         {/* Clean Media Hooks Sync State directly from native player components */}
         <video
           ref={videoRef}
-          src={videoSrc}
+          src={videoSrc || undefined}
           poster={resolvedVideo?.thumb}
           crossOrigin="anonymous"
           className="w-full h-full object-contain bg-black"
@@ -340,9 +325,9 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
               onPlaybackProgress?.(Math.min(100, Math.round((player.currentTime / player.duration) * 100)));
             }
           }}
-          onEnded={(e) => {
+          onEnded={() => {
             onPlaybackProgress?.(100);
-            if (!isLooping) { setIsPlaying(false); playNext(); }
+            setIsPlaying(false);
           }}
           onWaiting={() => setIsBuffering(true)}
           onCanPlay={() => setIsBuffering(false)}
@@ -425,7 +410,7 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
                 <Clapperboard className="h-4 w-4" />
               </div>
               <h1 className="text-sm font-medium text-zinc-100 truncate drop-shadow-md">
-                {resolvedVideo?.title ?? `Demo Workspace Track ${videoIndex + 1}`}
+                {resolvedVideo?.title ?? "Video"}
               </h1>
             </div>
 
@@ -521,10 +506,6 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
               
               {/* Left Side Control Blocks */}
               <div className="flex items-center gap-1 sm:gap-2">
-                <button onClick={playPrev} className="p-2 rounded-xl bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"  title="Previous Video" >
-                  <ChevronRight className="h-4 w-4 rotate-180"/>
-                </button>
-
                 <button onClick={() => handleSkip(-10)} className="p-2 rounded-xl bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors" title="Rewind 10 seconds">
                   <RotateCcw className="h-4 w-4" />
                 </button>
@@ -541,9 +522,6 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
                   <RotateCw className="h-4 w-4" />
                 </button>
 
-                <button onClick={playNext} className="p-2 rounded-xl bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors" title="Next Video">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
               </div>
 
               {/* Right Side Control Blocks */}
