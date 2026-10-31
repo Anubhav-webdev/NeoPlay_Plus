@@ -1,56 +1,46 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiMoreVertical } from "react-icons/fi";
+import { FiMoreVertical, FiPlay } from "react-icons/fi";
 import AddToPlaylistButton from "../Playlist/AddToPlaylistButton";
 
-// Container variant for staggered children animation
+// Framer Motion variants
 const listContainerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
+      staggerChildren: 0.05,
     },
   },
 };
 
-// Item variant for individual card slide-in
 const cardVariants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      type: "spring",
-      stiffness: 260,
-      damping: 20,
-    },
+    transition: { type: "spring", stiffness: 260, damping: 20 },
   },
 };
 
 export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
-  // Handler to prevent card redirection when clicking sub-buttons
-  const handleActionClick = (e, actionType, videoId) => {
+  const handleMenuClick = (e, videoId) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (actionType === "menu") {
-      console.log(`Open context menu for video ${videoId}`);
-    }
+    console.log(`Open context menu for video ${videoId}`);
   };
 
   return (
-    <aside className="flex flex-col gap-2 text-left select-none w-full max-w-[700px] all-font">
+    <aside className="w-full max-w-[700px] select-none text-left">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-1 px-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400/80">
-          Related content
+      <div className="mb-2 px-1">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+          Related Content
         </h3>
       </div>
 
-      {/* Video List Stack with Staggered Motion */}
-      <motion.div 
+      {/* Video List */}
+      <motion.div
         variants={listContainerVariants}
         initial="hidden"
         animate="visible"
@@ -60,93 +50,77 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
           <motion.div key={item.id} variants={cardVariants}>
             <Link
               to={`/video/${item.id}`}
-              onClick={() => setIsPlaying(false)}
-              className="flex gap-3 rounded-xl p-1.5 transition-colors duration-300 ease-out 
-                         bg-zinc-800/30 border border-zinc-800/40 
-                         hover:bg-zinc-800/50 hover:border-zinc-700/60 hover:shadow-lg hover:shadow-black/20 
-                         group relative overflow-hidden"
+              onClick={() => setIsPlaying?.(false)}
+              className="group relative flex w-full gap-2.5 rounded-xl p-1.5  bg-[#0b0e17]/90 backdrop-blur-2xl border border-cyan-500/20 shadow-[0_10px_40px_rgba(0,0,0,0.6)] transition-all duration-300 hover:border-cyan-500/50 hover:shadow-[0_0_35px_rgba(168,85,247,0.15)] mt-4 overflow-hidden"
             >
-              {/* Thumbnail Wrapper */}
-              <div className="relative aspect-video w-28 sm:w-36 md:w-40 shrink-0 overflow-hidden rounded-lg bg-zinc-950 border border-zinc-800/80">
+                   <div className="absolute -top-24 -right-24 w-50 h-42 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none group-hover:bg-cyan-600/30 transition-all duration-500" />
+              {/* Thumbnail Container (YouTube-styled ratio & size) */}
+              <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-zinc-900 sm:w-40">
                 <img
                   src={item.thumb}
                   alt={item.title}
                   loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                  className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
                 />
-                
-                {/* Dark Overlay on Hover with Scale Animation */}
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileHover={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none"
-                >
-                  <motion.svg 
-                    initial={{ scale: 0.6 }}
-                    whileHover={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                    className="w-6 h-6 text-white drop-shadow-md" 
-                    fill="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M8 5v14l11-7z"/>
-                  </motion.svg>
-                </motion.div>
+
+                {/* Dark Hover Overlay with Play Icon */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm">
+                    <FiPlay className="ml-0.5 h-4 w-4 fill-current" />
+                  </div>
+                </div>
 
                 {/* Duration Badge */}
-                <span className="absolute bottom-1.5 right-1.5 rounded bg-zinc-950/80 backdrop-blur-[2px] px-1.5 py-0.5 text-[10px] font-semibold text-zinc-200 tracking-wide border border-white/5">
+                <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold text-white tracking-wide">
                   {item.duration || "12:04"}
                 </span>
               </div>
 
-              {/* Text Metadata Content */}
-              <div className="flex flex-col justify-start py-0.5 min-w-0 flex-1 relative">
-                <h4 className="text-sm font-semibold text-zinc-100 line-clamp-2 tracking-tight group-hover:text-cyan-500 transition-colors duration-200 leading-snug pr-2">
-                  {item.title}
-                </h4>
-                
-                <div className="mt-auto pt-1 flex items-end justify-between gap-2">
-                  {/* Left metadata info column */}
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-[12px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors truncate">
-                      {item.channel}
-                    </span>
-                    <span className="text-[11px] text-zinc-500 tracking-normal truncate">
-                      {item.views} views
-                    </span>
-                  </div>
+              {/* Video Metadata */}
+              <div className="flex flex-1 flex-col justify-between min-w-0 py-0.5 pr-1">
+                <div>
+                  <h4 className="line-clamp-2 text-xs font-semibold leading-snug text-zinc-100 transition-colors group-hover:text-cyan-400 sm:text-sm">
+                    {item.title}
+                  </h4>
+                  <p className="mt-1 truncate text-[11px] font-medium text-zinc-400 hover:text-zinc-200 sm:text-xs">
+                    {item.channel}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 sm:text-[11px]">
+                    {item.views} views
+                  </p>
+                </div>
 
-                  {/* Right Action Buttons with Press Effect */}
-                  <div className="flex items-center gap-0.5 shrink-0 mb-0.5">
-                    {/* Playlist Button */}
+                {/* Action Buttons (Always visible on mobile/touch, hover-triggered on desktop) */}
+                <div className="flex items-center justify-end gap-1 pt-1">
+                  <div onClick={(e) => e.stopPropagation()}>
                     <AddToPlaylistButton
                       contentId={item.id}
                       contentType="Video"
                       showLabel={false}
                       label="Add to playlist"
-                      iconClassName="w-5 h-5"
-                      className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors duration-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                      iconClassName="w-4 h-4"
+                      className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-700/60 hover:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
                     />
-
-                    {/* 3-Dot Menu Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleActionClick(e, "menu", item.id)}
-                      title="More options"
-                      className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    >
-                      <FiMoreVertical className="w-4 h-4"/>
-                    </motion.button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleMenuClick(e, item.id)}
+                    title="More options"
+                    className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-700/60 hover:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                  >
+                    <FiMoreVertical className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </Link>
           </motion.div>
         ))}
+
         {relatedVideos.length === 0 && (
-          <p className="px-1 text-xs text-zinc-500">No other published videos yet.</p>
+          <p className="px-1 py-4 text-center text-xs text-zinc-500">
+            No related videos available.
+          </p>
         )}
       </motion.div>
     </aside>

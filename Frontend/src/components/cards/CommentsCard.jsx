@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiChevronDown, FiChevronRight, FiSend } from "react-icons/fi";
+import { FiChevronDown, FiChevronRight, FiSend, FiMessageSquare } from "react-icons/fi";
 import { useSelector } from "react-redux";
 import {
   addCommentReply,
@@ -51,6 +51,11 @@ export default function CommentsCard({ contentId, onCountChange }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  // Mobile state management
+  const [activeMobileIndex, setActiveMobileIndex] = useState(0);
+  const [showAllMobile, setShowAllMobile] = useState(false);
+  const [isSliding, setIsSliding] = useState(false);
+
   useEffect(() => {
     if (!contentId) return undefined;
     const controller = new AbortController();
@@ -71,6 +76,22 @@ export default function CommentsCard({ contentId, onCountChange }) {
       });
     return () => controller.abort();
   }, [contentId, onCountChange]);
+
+  // Auto-slide effect for mobile preview
+  useEffect(() => {
+    if (comments.length <= 1 || showAllMobile) return;
+
+    const interval = setInterval(() => {
+      setIsSliding(true);
+      setTimeout(() => {
+        setActiveMobileIndex((prev) => (prev + 1) % comments.length);
+        setIsSliding(false);
+      }, 300); // Duration matches CSS transition
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [comments.length, showAllMobile]);
+
   const loading = Boolean(contentId && loadedContentId !== contentId);
 
   const handleAddComment = async (event) => {
@@ -86,6 +107,7 @@ export default function CommentsCard({ contentId, onCountChange }) {
         return updated;
       });
       setInputText("");
+      setActiveMobileIndex(0);
     } catch (submitError) {
       setError(submitError.message || "Could not post your comment.");
     } finally {
@@ -105,11 +127,13 @@ export default function CommentsCard({ contentId, onCountChange }) {
     setExpandedReplies((current) => new Set(current).add(commentId));
     try {
       const replies = await getCommentReplies(commentId);
-      setComments((current) => current.map((comment) => (
-        comment.id === commentId
-          ? { ...comment, replies: replies.map(displayReply) }
-          : comment
-      )));
+      setComments((current) =>
+        current.map((comment) =>
+          comment.id === commentId
+            ? { ...comment, replies: replies.map(displayReply) }
+            : comment
+        )
+      );
       setError("");
     } catch (loadError) {
       setError(loadError.message || "Could not load replies.");
@@ -123,11 +147,13 @@ export default function CommentsCard({ contentId, onCountChange }) {
     setError("");
     try {
       const reply = await addCommentReply(commentId, replyText.trim());
-      setComments((current) => current.map((comment) => (
-        comment.id === commentId
-          ? { ...comment, replies: [...comment.replies, displayReply(reply)] }
-          : comment
-      )));
+      setComments((current) =>
+        current.map((comment) =>
+          comment.id === commentId
+            ? { ...comment, replies: [...comment.replies, displayReply(reply)] }
+            : comment
+        )
+      );
       setExpandedReplies((current) => new Set(current).add(commentId));
       setReplyText("");
       setReplyingTo(null);
@@ -146,11 +172,25 @@ export default function CommentsCard({ contentId, onCountChange }) {
     );
   }
 
+  const activeMobileComment = comments[activeMobileIndex];
+
   return (
     <section className="w-full max-w-5xl rounded-3xl border border-slate-800/80 bg-[#0f121d] p-5 shadow-2xl sm:p-8">
-      <h2 className="mb-5 text-lg font-bold text-white">
-        Comments <span className="text-sm font-medium text-slate-500">({comments.length})</span>
-      </h2>
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-white">
+          Comments <span className="text-sm font-medium text-slate-500">({comments.length})</span>
+        </h2>
+        {/* Mobile toggle button */}
+        {comments.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllMobile(!showAllMobile)}
+            className="text-xs font-semibold text-purple-400 hover:underline sm:hidden"
+          >
+            {showAllMobile ? "Show Preview" : "View All"}
+          </button>
+        )}
+      </div>
 
       {user ? (
         <form onSubmit={handleAddComment} className="mb-6 flex gap-3">
@@ -179,99 +219,147 @@ export default function CommentsCard({ contentId, onCountChange }) {
       )}
 
       {error && <p role="alert" className="mb-4 text-sm text-red-300">{error}</p>}
+
       {loading ? (
         <p className="py-6 text-sm text-slate-400">Loading comments...</p>
       ) : comments.length === 0 && !error ? (
         <p className="py-6 text-sm text-slate-400">No comments yet. Start the conversation.</p>
       ) : comments.length > 0 ? (
-        <div className="space-y-5">
-          {comments.map((comment) => {
-            const repliesExpanded = expandedReplies.has(comment.id);
-            return (
-              <article key={comment.id} className="border-b border-slate-800/60 pb-5 last:border-0">
-                <div className="flex gap-3">
-                  {comment.avatar ? (
-                    <img src={comment.avatar} alt="Comment author profile photo" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+        <>
+          {/* Mobile Single-Comment Slide View */}
+          {!showAllMobile && activeMobileComment && (
+            <div className="block sm:hidden">
+              <div
+                onClick={() => setShowAllMobile(true)}
+                className="cursor-pointer rounded-2xl border border-slate-800 bg-[#121522] p-4 transition-all hover:border-slate-700"
+              >
+                <div className="flex items-center justify-between pb-2 text-xs text-slate-400">
+                  <span className="flex items-center gap-1 font-semibold text-slate-300">
+                    <FiMessageSquare className="text-purple-400" /> Highlighted Comment
+                  </span>
+                  <span>Tap to expand ({activeMobileIndex + 1}/{comments.length})</span>
+                </div>
+
+                <div
+                  className={`flex gap-3 transition-all duration-300 ease-in-out ${
+                    isSliding ? "translate-x-4 opacity-0" : "translate-x-0 opacity-100"
+                  }`}
+                >
+                  {activeMobileComment.avatar ? (
+                    <img
+                      src={activeMobileComment.avatar}
+                      alt="Author avatar"
+                      className="h-8 w-8 shrink-0 rounded-full object-cover"
+                    />
                   ) : (
-                    <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-sm font-bold text-white">
-                      {comment.user.charAt(0).toUpperCase()}
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-xs font-bold text-white">
+                      {activeMobileComment.user.charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 text-xs">
-                      <span className="font-bold text-slate-200">{comment.user}</span>
-                      {comment.handle && <span className="text-slate-500">{comment.handle}</span>}
-                      <time className="text-slate-600">{formatTime(comment.time)}</time>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-bold text-slate-200">{activeMobileComment.user}</span>
+                      <time className="text-slate-500">{formatTime(activeMobileComment.time)}</time>
                     </div>
-                    <p className="mt-1.5 break-words text-sm leading-relaxed text-slate-300">{comment.text}</p>
-                    <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-slate-500">
-                      <button
-                        type="button"
-                        onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                        className="hover:text-cyan-300"
-                      >
-                        Reply
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleReplies(comment.id)}
-                        className="flex items-center gap-1 hover:text-cyan-300"
-                      >
-                        {repliesExpanded ? <FiChevronDown /> : <FiChevronRight />}
-                        {repliesExpanded ? "Hide replies" : "View replies"}
-                      </button>
-                    </div>
-
-                    {replyingTo === comment.id && (
-                      user ? (
-                        <form onSubmit={(event) => handleAddReply(event, comment.id)} className="mt-3 flex gap-2">
-                          <input
-                            type="text"
-                            value={replyText}
-                            maxLength={2000}
-                            onChange={(event) => setReplyText(event.target.value)}
-                            placeholder="Write a reply..."
-                            aria-label="Write a reply"
-                            className="min-w-0 flex-1 rounded-lg border border-slate-800 bg-[#121522] px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                          />
-                          <button type="submit" disabled={!replyText.trim() || submitting} className="rounded-lg bg-slate-800 px-3 text-xs font-semibold text-white disabled:opacity-50">
-                            Reply
-                          </button>
-                        </form>
-                      ) : (
-                        <p className="mt-3 text-xs text-slate-400"><Link to="/signup" className="text-cyan-300 hover:underline">Sign in</Link> to reply.</p>
-                      )
-                    )}
-
-                    {repliesExpanded && (
-                      <div className="mt-4 space-y-3 border-l-2 border-slate-800 pl-4">
-                        {comment.replies.length === 0 ? (
-                          <p className="text-xs text-slate-500">No replies yet.</p>
-                        ) : comment.replies.map((reply) => (
-                          <div key={reply.id} className="flex gap-2.5">
-                            {reply.avatar ? (
-                              <img src={reply.avatar} alt="Reply author profile photo" className="h-7 w-7 shrink-0 rounded-full object-cover" />
-                            ) : (
-                              <div aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-300">{reply.user.charAt(0).toUpperCase()}</div>
-                            )}
-                            <div>
-                            <div className="flex flex-wrap items-center gap-x-2 text-xs">
-                              <span className="font-semibold text-slate-300">{reply.user}</span>
-                              {reply.handle && <span className="text-slate-500">{reply.handle}</span>}
-                              <time className="text-slate-600">{formatTime(reply.time)}</time>
-                            </div>
-                            <p className="mt-1 break-words text-sm text-slate-400">{reply.text}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-300">
+                      {activeMobileComment.text}
+                    </p>
                   </div>
                 </div>
-              </article>
-            );
-          })}
-        </div>
+              </div>
+            </div>
+          )}
+
+          {/* Full List (Always visible on Desktop, toggling on Mobile) */}
+          <div className={`space-y-5 ${!showAllMobile ? "hidden sm:block" : "block"}`}>
+            {comments.map((comment) => {
+              const repliesExpanded = expandedReplies.has(comment.id);
+              return (
+                <article key={comment.id} className="border-b border-slate-800/60 pb-5 last:border-0">
+                  <div className="flex gap-3">
+                    {comment.avatar ? (
+                      <img src={comment.avatar} alt="Comment author profile photo" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                    ) : (
+                      <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-sm font-bold text-white">
+                        {comment.user.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 text-xs">
+                        <span className="font-bold text-slate-200">{comment.user}</span>
+                        {comment.handle && <span className="text-slate-500">{comment.handle}</span>}
+                        <time className="text-slate-600">{formatTime(comment.time)}</time>
+                      </div>
+                      <p className="mt-1.5 break-words text-sm leading-relaxed text-slate-300">{comment.text}</p>
+                      <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-slate-500">
+                        <button
+                          type="button"
+                          onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                          className="hover:text-cyan-300"
+                        >
+                          Reply
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleReplies(comment.id)}
+                          className="flex items-center gap-1 hover:text-cyan-300"
+                        >
+                          {repliesExpanded ? <FiChevronDown /> : <FiChevronRight />}
+                          {repliesExpanded ? "Hide replies" : "View replies"}
+                        </button>
+                      </div>
+
+                      {replyingTo === comment.id && (
+                        user ? (
+                          <form onSubmit={(event) => handleAddReply(event, comment.id)} className="mt-3 flex gap-2">
+                            <input
+                              type="text"
+                              value={replyText}
+                              maxLength={2000}
+                              onChange={(event) => setReplyText(event.target.value)}
+                              placeholder="Write a reply..."
+                              aria-label="Write a reply"
+                              className="min-w-0 flex-1 rounded-lg border border-slate-800 bg-[#121522] px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                            />
+                            <button type="submit" disabled={!replyText.trim() || submitting} className="rounded-lg bg-slate-800 px-3 text-xs font-semibold text-white disabled:opacity-50">
+                              Reply
+                            </button>
+                          </form>
+                        ) : (
+                          <p className="mt-3 text-xs text-slate-400"><Link to="/signup" className="text-cyan-300 hover:underline">Sign in</Link> to reply.</p>
+                        )
+                      )}
+
+                      {repliesExpanded && (
+                        <div className="mt-4 space-y-3 border-l-2 border-slate-800 pl-4">
+                          {comment.replies.length === 0 ? (
+                            <p className="text-xs text-slate-500">No replies yet.</p>
+                          ) : comment.replies.map((reply) => (
+                            <div key={reply.id} className="flex gap-2.5">
+                              {reply.avatar ? (
+                                <img src={reply.avatar} alt="Reply author profile photo" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                              ) : (
+                                <div aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-300">{reply.user.charAt(0).toUpperCase()}</div>
+                              )}
+                              <div>
+                                <div className="flex flex-wrap items-center gap-x-2 text-xs">
+                                  <span className="font-semibold text-slate-300">{reply.user}</span>
+                                  {reply.handle && <span className="text-slate-500">{reply.handle}</span>}
+                                  <time className="text-slate-600">{formatTime(reply.time)}</time>
+                                </div>
+                                <p className="mt-1 break-words text-sm text-slate-400">{reply.text}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
       ) : null}
     </section>
   );

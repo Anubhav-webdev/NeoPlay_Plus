@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import Logo from "../../photo&Video/logo.png";
 import { motion, AnimatePresence } from "framer-motion";
+import LoginVideo from "../../photo&Video/Neoplay+video.mp4";
 
 /* Redux Actions - authSlice manages form states and visibility toggles */
 import {
@@ -79,8 +80,8 @@ const LoginAndSignup = () => {
     if (!signupData.email.trim()) err.email = "Email is required";
     else if (!/^\S+@\S+\.\S+$/.test(signupData.email)) err.email = "Invalid email address";
     if (!signupData.phone.trim()) err.phone = "Phone number is required";
-    else if (!/^\+?[0-9]{7,15}$/.test(signupData.phone)) {
-      err.phone = "Enter 7 to 15 digits, optionally starting with +";
+    else if (!/^\+?[0-9]{10}$/.test(signupData.phone)) {
+      err.phone = "Enter 10 digits";
     }
     if (!signupData.password.trim()) err.password = "Password is required";
     else if (signupData.password.length < 8) err.password = "Must be at least 8 characters";
@@ -180,20 +181,73 @@ const LoginAndSignup = () => {
   const signupFilled = signupData.username.trim() && signupData.email.trim() && signupData.phone.trim() && signupData.password.trim() && signupData.confirmPassword.trim();
 
   return (
-    <div className="min-h-screen bg-[#070B14] text-[#F8FAFC] flex font-Manrope antialiased selection:bg-[#00E5FF]/30 selection:text-[#F8FAFC] mb-8">
+    <div className="min-h-screen bg-[#070B14] text-[#F8FAFC] flex font-Manrope antialiased selection:bg-[#00E5FF]/30 selection:text-[#F8FAFC] mb-1">
       
-      {/* Left Panel: Branding Sidebar (Visible on desktop) */}
-      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-[#0B1220] to-[#7C3AED] p-5 flex-col justify-between border-r border-[#00E5FF]/40 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,229,255,0.08),transparent_45%)]" />
-        <div className="flex items-center gap-2 cursor-pointer relative z-10">
-          {Logo && <img src={Logo} alt="NeoPlay+" className="h-10 w-auto object-contain" />}
-        </div>
-        <div className="space-y-6 max-w-md relative z-10">
-          <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-[1.1]">Welcome to NeoPlay+</h2>
-          <p className="text-gray-400 text-base leading-relaxed">Join our vibrant community of creators and viewers, where you can upload videos, share images, post tweets, create playlists, and connect with your audience like never before.</p>
-        </div>
-        <p className="text-xs text-gray-500 relative z-10">&copy; 2026 NeoPlay+ Built for independent creators.</p>
-      </div>
+{/* Left Panel: Cinematic Video Background */}
+<div className="hidden md:flex md:w-1/2 relative flex-col justify-between p-8 lg:p-12 overflow-hidden border-r border-[#00E5FF]/30">
+
+  {/* Background Video */}
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  preload="metadata"
+  className="absolute inset-0 w-full h-full object-cover"
+>
+  <source src={LoginVideo} type="video/mp4" />
+</video>
+
+  {/* Dark Gradient Overlay */}
+  <div className="absolute inset-0 bg-gradient-to-b from-[#070B14]/70 via-[#070B14]/40 to-[#070B14]/95" />
+
+  {/* Cyan / Purple Glow */}
+  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,229,255,0.18),transparent_45%)]" />
+
+  {/* Logo */}
+  <div className="flex items-center gap-3 relative z-10">
+    <img
+      src={Logo}
+      alt="NeoPlay+"
+      className="h-12 w-auto object-contain"
+    />
+  </div>
+
+  {/* Main Content */}
+  <div className="relative z-10 max-w-lg space-y-6">
+
+    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#00E5FF]/40 bg-black/30 backdrop-blur-md text-[#00E5FF] text-xs font-semibold tracking-widest uppercase">
+      <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse" />
+      Your Creative Universe
+    </span>
+
+    <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-[1.1]">
+      Welcome to NeoPlay+
+      <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#4edfef] to-[#A78BFA] text-2xl">
+        Create. Share.  Inspire.
+      </span>
+    </h2>
+
+    <p className="text-gray-300 text-base lg:text-lg leading-relaxed max-w-md">
+      Join NeoPlay+ and explore a world of creators, cinematic videos,
+      stunning photography, and meaningful conversations.
+    </p>
+
+    <div className="flex items-center gap-4 pt-3">
+      <div className="h-1 w-16 rounded-full bg-[#00E5FF]" />
+      <span className="text-xs text-gray-400 tracking-widest uppercase">
+        Built for independent creators
+      </span>
+    </div>
+
+  </div>
+
+  {/* Footer */}
+  <p className="relative z-10 text-xs text-gray-400">
+    © 2026 NeoPlay+ All rights reserved.
+  </p>
+
+</div>
 
       {/* Right Panel: Interactive Form Container */}
       <div className="w-full min-h-screen md:w-1/2 flex pt-4 justify-center p-2 sm:p-2 bg-[#070B14]">

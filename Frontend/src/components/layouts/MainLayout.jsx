@@ -66,7 +66,7 @@ function Layout() {
           onMouseLeave={() => dispatch(setSidebarExpanded(false))}
         />
 
-        <main className="flex-1 mt-3 py-2">
+        <main className="flex-1  py-2">
           <Outlet />
         </main>
       </div>

@@ -84,7 +84,7 @@ export default function ImageCard({
   return (
     <>
       <div
-        className={`group relative block min-h-48 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 shadow-lg transition duration-500 hover:-translate-y-1 hover:border-amber-300/50 hover:shadow-2xl hover:shadow-black/40 ${className}`}
+        className={`group relative block min-h-48 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 shadow-lg transition duration-500 hover:-translate-y-1 hover:border-green-500/70 hover:shadow-2xl hover:shadow-black/40 ${className}`}
       >
         <div className="relative w-full h-full overflow-hidden">
           

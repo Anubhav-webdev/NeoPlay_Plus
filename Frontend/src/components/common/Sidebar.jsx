@@ -50,7 +50,7 @@ function SidebarLink({ item, expanded, isActive, badge,badgeColor, dot, onClose 
               {badge}
             </span>
           )}
-          {dot && <span className="h-1.5 w-1.5 rounded-full bg-[#00ffc8] shadow-[0_0_8px_rgba(124,58,237,0.35)] animate-pulse" />}
+          {dot && <span className="h-1.5 w-1.5 rounded-full bg-[#ff0000] shadow-[0_0_8px_rgba(124,58,237,0.35)]" />}
           {item.rightIcon && <span className="text-white/40 text-xl">{item.rightIcon}</span>}
         </div>
       )}

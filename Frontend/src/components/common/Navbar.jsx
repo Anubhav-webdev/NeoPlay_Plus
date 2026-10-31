@@ -39,7 +39,7 @@ export function Header({ searchOpen, setSearchOpen, mobileSidebarOpen, setMobile
         scrolled 
           ? "border-[#111827]/90 bg-[#0B1220]/90 backdrop-blur-md py-2.5" 
           : "border-[#111827]/70 bg-linear-to-tr from-[#070B14] via-[#0B1220] to-[#111827] py-4 shadow-sm"
-      } px-4 md:px-8`}
+      } px-4 md:px-2`}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between">
         
