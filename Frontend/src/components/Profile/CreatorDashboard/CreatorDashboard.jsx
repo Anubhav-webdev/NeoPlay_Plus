@@ -10,12 +10,13 @@ export default function CreatorDashboard() {
   const dispatch = useDispatch();
   const { user, initialized } = useSelector((state) => state.auth);
   const [creator, setCreator] = useState(null);
-  const [displayName, setDisplayName] = useState(user?.name || user?.username || '');
+  const [displayName, setDisplayName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [creatorProfileUnavailable, setCreatorProfileUnavailable] = useState(false);
+  const applicationName = displayName ?? (user?.name || user?.username || '');
 
   useEffect(() => {
     if (!user) return undefined;
@@ -80,7 +81,7 @@ export default function CreatorDashboard() {
 
   const handleApplication = async (event) => {
     event.preventDefault();
-    const name = displayName.trim();
+    const name = applicationName.trim();
     if (name.length < 2) {
       setError('Channel name must be at least 2 characters.');
       return;
@@ -132,7 +133,7 @@ export default function CreatorDashboard() {
             </label>
             <input
               id="creator-display-name"
-              value={displayName}
+              value={applicationName}
               onChange={(event) => setDisplayName(event.target.value)}
               maxLength={100}
               minLength={2}

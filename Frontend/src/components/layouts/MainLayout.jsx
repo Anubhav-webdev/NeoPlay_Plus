@@ -25,12 +25,16 @@ function Layout() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem("loggedInUser");
-    if (!storedUser) return;
+    if (!storedUser) {
+      dispatch(restoreUser(null));
+      return;
+    }
     try {
       dispatch(restoreUser(JSON.parse(storedUser)));
     } catch (error) {
       console.error("Could not restore the signed-in account", error);
       localStorage.removeItem("loggedInUser");
+      dispatch(restoreUser(null));
     }
   }, [dispatch]);
 
