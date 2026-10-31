@@ -90,6 +90,7 @@ export default function CreatorStudio({ creator, user }) {
       <main className="relative z-10 mx-auto max-w-7xl space-y-6 px-4 pt-6 sm:px-6 lg:px-8">
         <CreatorIdentity
           channelIdentity={profile.channelIdentity}
+          creatorId={creator.creatorId}
           setChannelIdentity={profile.setChannelIdentity}
           isEditingProfileText={profile.isEditingProfileText}
           setIsEditingProfileText={profile.setIsEditingProfileText}

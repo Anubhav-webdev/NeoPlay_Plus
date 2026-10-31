@@ -17,6 +17,17 @@ const creatorSchema = new mongoose.Schema(
       maxlength: 100,
     },
 
+    creatorId: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      immutable: true,
+      unique: true,
+      sparse: true,
+      match: /^[a-z0-9]{7,30}$/,
+      maxlength: 30,
+    },
+
     avatar: {
       type: String,
       default: null,

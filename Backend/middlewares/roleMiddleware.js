@@ -23,3 +23,16 @@ export const requireApprovedCreator = asyncHandler(async (req, res, next) => {
   req.creator = creator;
   next();
 });
+
+// Pending creators may finish their channel profile while it is being reviewed.
+export const requireCreatorProfileAccess = asyncHandler(async (req, res, next) => {
+  const creator = await Creator.findOne({
+    userId: req.user?._id,
+    applicationStatus: { $in: ["pending", "approved"] },
+  });
+  if (!creator) {
+    throw new ApiError(403, "An active creator application is required");
+  }
+  req.creator = creator;
+  next();
+});

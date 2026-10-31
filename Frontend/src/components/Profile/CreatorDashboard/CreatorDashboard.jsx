@@ -2,21 +2,25 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginSuccess } from '../../../redux/slices/authSlice.js';
-import { applyAsCreator, getMyCreatorProfile } from '../../../api/mediaApi.js';
+import {
+  applyAsCreator,
+  getMyCreatorProfile,
+  updateMyCreatorProfile,
+  uploadCreatorProfileImage,
+} from '../../../api/mediaApi.js';
 import CreatorStudio from './CreatorStudio.jsx';
+import CreatorSetupForm from './CreatorSetupForm.jsx';
 import '../../../App.css';
 
 export default function CreatorDashboard() {
   const dispatch = useDispatch();
   const { user, initialized } = useSelector((state) => state.auth);
   const [creator, setCreator] = useState(null);
-  const [displayName, setDisplayName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [creatorProfileUnavailable, setCreatorProfileUnavailable] = useState(false);
-  const applicationName = displayName ?? (user?.name || user?.username || '');
 
   useEffect(() => {
     if (!user) return undefined;
@@ -79,80 +83,49 @@ export default function CreatorDashboard() {
     );
   }
 
-  const handleApplication = async (event) => {
-    event.preventDefault();
-    const name = applicationName.trim();
-    if (name.length < 2) {
-      setError('Channel name must be at least 2 characters.');
-      return;
-    }
-
+  const handleSetupSubmit = async ({ profile, avatarFile, bannerFile }) => {
     setSubmitting(true);
     setError('');
+    let setupSaved = false;
     try {
-      setCreator(await applyAsCreator(name));
+      let updatedCreator = creator?.applicationStatus === 'pending'
+        ? await updateMyCreatorProfile(profile)
+        : await applyAsCreator(profile);
+      setupSaved = true;
+      setCreator(updatedCreator);
+
+      for (const [imageType, file] of [['avatar', avatarFile], ['banner', bannerFile]]) {
+        if (!file) continue;
+        updatedCreator = await uploadCreatorProfileImage(file, imageType);
+        setCreator(updatedCreator);
+      }
+      return true;
     } catch (submitError) {
-      setError(submitError.message || 'Could not submit your creator application.');
+      const message = submitError.message || 'Could not save your creator setup.';
+      setError(setupSaved
+        ? `Your channel details are saved, but an image could not be uploaded: ${message}`
+        : message);
+      return false;
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <main className="mx-auto max-w-2xl px-4 py-12 text-white">
-      <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-6 sm:p-8">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Creator setup</p>
-        <h1 className="mt-2 text-2xl font-bold">Create your creator channel</h1>
+  if (creator?.applicationStatus === 'suspended') {
+    return <main className="mx-auto max-w-2xl px-4 py-12 text-sm text-amber-200">This creator account is suspended. Contact support for assistance.</main>;
+  }
 
-        {creator?.applicationStatus === 'pending' ? (
-          <div className="mt-5 space-y-4">
-            <p className="text-sm text-slate-300">
-              Your application for <strong>{creator.displayName}</strong> is waiting for admin approval. Uploading and publishing will be available after approval.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setLoading(true);
-                setRefreshKey((key) => key + 1);
-              }}
-              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold hover:bg-cyan-500"
-            >
-              Check application status
-            </button>
-            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-          </div>
-        ) : creator?.applicationStatus === 'suspended' ? (
-          <p className="mt-5 text-sm text-amber-200">This creator account is suspended. Contact support for assistance.</p>
-        ) : (
-          <form onSubmit={handleApplication} className="mt-5 space-y-4">
-            {creator?.applicationStatus === 'rejected' && (
-              <p className="text-sm text-amber-200">Your previous application was declined. Update your channel name to apply again.</p>
-            )}
-            <label className="block text-sm font-medium text-slate-300" htmlFor="creator-display-name">
-              Channel name
-            </label>
-            <input
-              id="creator-display-name"
-              value={applicationName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              maxLength={100}
-              minLength={2}
-              required
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-400"
-              placeholder="Enter your creator channel name"
-            />
-            <p className="text-xs text-slate-400">Your application is reviewed before creator uploads are enabled.</p>
-            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold hover:bg-cyan-500 disabled:cursor-wait disabled:opacity-60"
-            >
-              {submitting ? 'Submitting...' : creator ? 'Apply again' : 'Create creator channel'}
-            </button>
-          </form>
-        )}
-      </section>
-    </main>
+  return (
+    <CreatorSetupForm
+      creator={creator}
+      user={user}
+      onSubmit={handleSetupSubmit}
+      isSaving={submitting}
+      error={error}
+      onRefreshStatus={() => {
+        setLoading(true);
+        setRefreshKey((key) => key + 1);
+      }}
+    />
   );
 }

@@ -97,11 +97,11 @@ export async function getMyCreatorAnalytics({ signal } = {}) {
   return result.data;
 }
 
-export async function applyAsCreator(displayName) {
+export async function applyAsCreator(profile) {
   const result = await apiFetch("/creators/apply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ displayName }),
+    body: JSON.stringify(profile),
   });
   return result.data.creator;
 }

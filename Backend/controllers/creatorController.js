@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileTypeFromFile } from "file-type";
 import sharp from "sharp";
+import mongoose from "mongoose";
 import Creator from "../models/Creator.js";
 import User from "../models/users.js";
 import ApiError from "../utils/ApiError.js";
@@ -19,6 +20,56 @@ const PROFILE_IMAGE_TYPES = {
 const PROFILE_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const PROFILE_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
+function creatorIdStem(displayName) {
+  const normalized = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const stem = /[a-z]/.test(normalized) ? normalized : `creator${normalized}`;
+  return stem.slice(0, 24) || "creator";
+}
+
+async function generateCreatorId(displayName) {
+  const stem = creatorIdStem(displayName);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const candidate = `${stem}${randomInt(100000, 1000000)}`;
+    if (!(await Creator.exists({ creatorId: candidate }))) return candidate;
+  }
+  throw new ApiError(503, "Could not generate a unique Creator ID. Please try again.");
+}
+
+async function ensureCreatorId(creator) {
+  if (creator.creatorId) return creator;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const candidate = await generateCreatorId(creator.displayName);
+    try {
+      const result = await Creator.collection.updateOne(
+        { _id: creator._id, creatorId: { $exists: false } },
+        { $set: { creatorId: candidate } },
+      );
+      const savedCreator = await Creator.findById(creator._id);
+      if (savedCreator?.creatorId) return savedCreator;
+      if (result.matchedCount === 0) continue;
+    } catch (error) {
+      if (error.code !== 11000) throw error;
+    }
+  }
+  throw new ApiError(503, "Could not assign a unique Creator ID. Please try again.");
+}
+
+function readCreatorProfile(body) {
+  const displayName = String(body.displayName || body.channelName || "").trim();
+  const tagline = body.tagline === undefined ? "" : body.tagline;
+  const about = body.about === undefined ? "" : body.about;
+  if (displayName.length < 2 || displayName.length > 100) {
+    throw new ApiError(400, "Channel name must be between 2 and 100 characters");
+  }
+  if (typeof tagline !== "string" || tagline.trim().length > 160) {
+    throw new ApiError(400, "Tagline must be text with at most 160 characters");
+  }
+  if (typeof about !== "string" || about.trim().length > 2000) {
+    throw new ApiError(400, "Description must be text with at most 2000 characters");
+  }
+  return { displayName, tagline: tagline.trim(), about: about.trim() };
+}
+
 // Creator directory contains approved profiles only.
 export const listCreators = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
@@ -29,7 +80,7 @@ export const listCreators = asyncHandler(async (req, res) => {
   const filter = { applicationStatus: "approved" };
   const [creators, total] = await Promise.all([
     Creator.find(filter)
-      .select("displayName avatar banner tagline about userId createdAt")
+      .select("creatorId displayName avatar banner tagline about userId createdAt")
       .populate("userId", "username name")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
@@ -43,38 +94,52 @@ export const listCreators = asyncHandler(async (req, res) => {
 });
 
 export const applyAsCreator = asyncHandler(async (req, res) => {
-  const displayName = String(req.body.displayName || "").trim();
-  if (displayName.length < 2 || displayName.length > 100) {
-    throw new ApiError(
-      400,
-      "Display name must be between 2 and 100 characters"
-    );
-  }
+  const profile = readCreatorProfile(req.body);
   const existing = await Creator.findOne({ userId: req.user._id });
   if (existing) {
     if (existing.applicationStatus !== "rejected") {
       throw new ApiError(409, "A creator application already exists");
     }
-    existing.displayName = displayName;
-    existing.applicationStatus = "pending";
-    existing.approvedAt = null;
-    await existing.save();
+    const persistentCreator = await ensureCreatorId(existing);
+    persistentCreator.displayName = profile.displayName;
+    persistentCreator.tagline = profile.tagline;
+    persistentCreator.about = profile.about;
+    persistentCreator.applicationStatus = "pending";
+    persistentCreator.approvedAt = null;
+    await persistentCreator.save();
     return sendResponse(res, 200, "Creator application resubmitted", {
-      creator: existing,
+      creator: persistentCreator,
     });
   }
-  const creator = await Creator.create({ userId: req.user._id, displayName });
-  return sendResponse(res, 201, "Creator application submitted", { creator });
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const creator = await Creator.create({
+        userId: req.user._id,
+        creatorId: await generateCreatorId(profile.displayName),
+        ...profile,
+      });
+      return sendResponse(res, 201, "Creator application submitted", { creator });
+    } catch (error) {
+      if (error.code !== 11000) throw error;
+      if (await Creator.exists({ userId: req.user._id })) {
+        throw new ApiError(409, "A creator application already exists");
+      }
+    }
+  }
+  throw new ApiError(503, "Could not generate a unique Creator ID. Please try again.");
 });
 
 export const getMyCreatorProfile = asyncHandler(async (req, res) => {
-  const creator = await Creator.findOne({ userId: req.user._id });
+  let creator = await Creator.findOne({ userId: req.user._id });
+  if (creator) creator = await ensureCreatorId(creator);
   return sendResponse(res, 200, "Creator application retrieved", { creator });
 });
 
 export const updateMyCreatorProfile = asyncHandler(async (req, res) => {
-  const creator = await Creator.findOne({ userId: req.user._id });
+  let creator = await Creator.findOne({ userId: req.user._id });
   if (!creator) throw new ApiError(404, "Creator profile not found");
+  creator = await ensureCreatorId(creator);
   if (req.body.displayName !== undefined) {
     if (typeof req.body.displayName !== "string") {
       throw new ApiError(400, "Display name must be text");
@@ -197,11 +262,18 @@ export const uploadCreatorProfileImage = asyncHandler(async (req, res) => {
   }
 });
 export const getCreator = asyncHandler(async (req, res) => {
-  validateObjectId(req.params.creatorId, "creatorId");
-  const creator = await Creator.findOne({
-    _id: req.params.creatorId,
+  const requestedId = String(req.params.creatorId || "").trim().toLowerCase();
+  const fields = "creatorId displayName avatar banner tagline about createdAt";
+  let creator = await Creator.findOne({
+    creatorId: requestedId,
     applicationStatus: "approved",
-  }).select("displayName avatar banner tagline about createdAt");
+  }).select(fields);
+  if (!creator && mongoose.isValidObjectId(requestedId)) {
+    creator = await Creator.findOne({
+      _id: requestedId,
+      applicationStatus: "approved",
+    }).select(fields);
+  }
   if (!creator) throw new ApiError(404, "Creator not found");
   return sendResponse(res, 200, "Creator retrieved", { creator });
 });

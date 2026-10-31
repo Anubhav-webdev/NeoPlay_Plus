@@ -9,7 +9,10 @@ import {
 } from "../controllers/creatorController.js";
 import { getCreatorAnalytics } from "../controllers/creatorAnalyticsController.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
-import { requireApprovedCreator } from "../middlewares/roleMiddleware.js";
+import {
+  requireApprovedCreator,
+  requireCreatorProfileAccess,
+} from "../middlewares/roleMiddleware.js";
 import {
   receiveProfileImageFile,
   requireReceivedMedia,
@@ -25,7 +28,7 @@ router.patch("/me", authenticate, updateMyCreatorProfile);
 router.post(
   "/me/images/:imageType",
   authenticate,
-  requireApprovedCreator,
+  requireCreatorProfileAccess,
   receiveProfileImageFile,
   requireReceivedMedia,
   uploadCreatorProfileImage,

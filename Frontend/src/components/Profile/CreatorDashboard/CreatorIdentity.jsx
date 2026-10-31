@@ -3,6 +3,7 @@ import { Edit2, Sliders, UploadCloud } from 'lucide-react';
 
 export default function CreatorIdentity({
   channelIdentity, 
+  creatorId,
   setChannelIdentity, 
   isEditingProfileText, 
   setIsEditingProfileText, 
@@ -76,6 +77,7 @@ export default function CreatorIdentity({
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 max-w-sm">
                 <input type="text" value={channelIdentity.name} maxLength={100} onChange={updateField('name')} className="bg-slate-950 border border-slate-800 text-sm px-3 py-1.5 rounded-xl text-white w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Creator Name" />
                 <input type="text" value={channelIdentity.username} readOnly className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-500 w-full focus:outline-none" aria-label="Account handle" />
+                {creatorId && <input type="text" value={`@${creatorId}`} readOnly className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl font-mono text-cyan-300 w-full focus:outline-none" aria-label="Permanent Creator ID" />}
                 <input type="text" maxLength={160} value={channelIdentity.tagline} onChange={updateField('tagline')} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-purple-400 w-full focus:outline-none focus:border-purple-500 transition-colors" placeholder="Tagline" />
                 <textarea maxLength={2000} value={channelIdentity.about} onChange={updateField('about')} className="bg-slate-950 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-slate-400 w-full focus:outline-none focus:border-purple-500 transition-colors resize-none h-16" placeholder="About" />
                 <button type="button" onClick={onSaveProfile} disabled={isSavingProfile || isUploadingProfileImage} className="bg-purple-600 hover:bg-purple-500 px-4 py-1.5 text-[10px] uppercase tracking-widest font-black text-white rounded-xl transition-all disabled:opacity-60">{isSavingProfile ? "Saving..." : "Save Profile"}</button>
@@ -87,6 +89,7 @@ export default function CreatorIdentity({
                   <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] px-2 py-0.5 font-bold uppercase rounded-md tracking-widest">Creator</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">{channelIdentity.username}</p>
+                {creatorId && <p className="text-[11px] font-mono text-cyan-300 mt-1">Creator ID: @{creatorId}</p>}
                 <p className="text-xs text-slate-300 mt-2 max-w-xl leading-relaxed">{channelIdentity.about}</p>
                 <p className="text-xs text-purple-400 font-semibold mt-1.5 tracking-wide">{channelIdentity.tagline}</p>
               </motion.div>
