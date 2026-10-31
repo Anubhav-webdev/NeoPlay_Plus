@@ -12,11 +12,8 @@ import HomeCreators from "../Home/HomeCreators";
 import HorizontalRow from "../common/HorizontalRow";
 import PlaylistCard from "../Playlist/PlaylsitCard";
 /* ─── shared constants & primitives ─── */
-import {
-  C,
-  MarqueeTicker,
-  TICKER_TOP
-} from "../Home/HomeConstants";
+import { C, TICKER_TOP } from "./homeTokens";
+import { MarqueeTicker } from "./HomePrimitives";
 
 /* ============================================================
    MAIN COMPOSITE PAGE

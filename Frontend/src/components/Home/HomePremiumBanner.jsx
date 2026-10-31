@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Radio, Check } from "lucide-react";
-import { C, FONT_DISPLAY } from "./HomeConstants";
+import { C, FONT_DISPLAY } from "./homeTokens";
 
 export default function HomePremiumBanner() {
   return (

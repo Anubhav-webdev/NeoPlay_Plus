@@ -8,7 +8,12 @@ import {
   FiClock, FiSettings, FiHelpCircle, 
   FiFlag, FiLogOut
 } from "react-icons/fi";
-import { FiMusic, FiDownload,FiUsers } from "react-icons/fi";
+
+const BADGE_COLOR_CLASSES = {
+  "teal-500": "bg-teal-500",
+  "amber-500": "bg-amber-500",
+  "red-500": "bg-red-500",
+};
 
 function SidebarLink({ item, expanded, isActive, badge,badgeColor, dot, onClose , disabled }) {
   const content = (
@@ -41,7 +46,7 @@ function SidebarLink({ item, expanded, isActive, badge,badgeColor, dot, onClose 
       {expanded && (
         <div className="flex items-center ml-2">
           {badge && badgeColor && (
-            <span className={`bg-${badgeColor} text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90`}>
+            <span className={`${BADGE_COLOR_CLASSES[badgeColor] || "bg-slate-500"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90`}>
               {badge}
             </span>
           )}

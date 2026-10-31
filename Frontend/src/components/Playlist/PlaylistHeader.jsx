@@ -1,4 +1,3 @@
-import React from 'react';
 import { Globe, Lock, Edit2, Trash2, Film, StickyNote, Plus } from 'lucide-react';
 
 export default function PlaylistHeader({
@@ -9,6 +8,7 @@ export default function PlaylistHeader({
   activeMediaCount,
   activeNotesCount,
   addNote,
+  onAddContent,
   openFullEdit,
   deletePlaylist
 }) {
@@ -66,6 +66,16 @@ export default function PlaylistHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {activeTab === 'media' && (
+            <button
+              type="button"
+              onClick={onAddContent}
+              disabled={!activePlaylistId}
+              className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Plus size={14} /> <span>Add media</span>
+            </button>
+          )}
           {activeTab === 'notes' && (
             <button
               onClick={addNote}

@@ -9,7 +9,8 @@ import VideoCard from "../Video/Videocard";
 import TweetCard from "../Tweet/TweetCard";
 import ImageCard from "../Image/ImageCard";
 import { getPublishedContent } from "../../api/contentApi";
-import { C, ChannelLabel } from "./HomeConstants";
+import { C } from "./homeTokens";
+import { ChannelLabel } from "./HomePrimitives";
 
 const tabs = [
   { id: "videos", label: "Video Channel", icon: VideoIcon },

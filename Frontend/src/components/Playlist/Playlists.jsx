@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Folder, Trash2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -47,16 +47,27 @@ function mapPlaylist(playlist) {
 export default function PlaylistDashboard() {
   const user = useSelector((state) => state.auth.user);
   const navigate = useNavigate();
-  const [playlists, setPlaylists] = useState([]);
+  const userId = user?._id || user?.id;
+  const normalizedUserId = userId ? String(userId) : null;
+  const [playlistState, setPlaylistState] = useState({ ownerId: null, items: [] });
+  const playlists = playlistState.ownerId === normalizedUserId ? playlistState.items : [];
+  const setPlaylists = useCallback((update) => {
+    setPlaylistState((current) => {
+      const currentItems = current.ownerId === normalizedUserId ? current.items : [];
+      const items = typeof update === "function" ? update(currentItems) : update;
+      return { ownerId: normalizedUserId, items };
+    });
+  }, [normalizedUserId]);
   const [activePlaylistId, setActivePlaylistId] = useState(null);
   const [activeTab, setActiveTab] = useState("media");
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
   const [loadedUserId, setLoadedUserId] = useState(null);
   const [error, setError] = useState("");
-  const userId = user?._id || user?.id;
-  const loading = Boolean(user && loadedUserId !== userId);
+  const loading = Boolean(normalizedUserId && loadedUserId !== normalizedUserId);
   const [selectedContentId, setSelectedContentId] = useState("");
   const [showAddContent, setShowAddContent] = useState(false);
+  const [availableMedia, setAvailableMedia] = useState([]);
+  const [isLoadingAvailableMedia, setIsLoadingAvailableMedia] = useState(false);
 
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
   const [editPlaylistName, setEditPlaylistName] = useState("");
@@ -69,7 +80,7 @@ export default function PlaylistDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (!normalizedUserId) return undefined;
     const controller = new AbortController();
     getMyPlaylists({ signal: controller.signal })
       .then((result) => {
@@ -86,10 +97,29 @@ export default function PlaylistDashboard() {
         if (!controller.signal.aborted) setError(loadError.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoadedUserId(userId);
+        if (!controller.signal.aborted) setLoadedUserId(normalizedUserId);
       });
     return () => controller.abort();
-  }, [user, userId]);
+  }, [normalizedUserId, setPlaylists]);
+
+  useEffect(() => {
+    if (!showAddContent) return undefined;
+    const controller = new AbortController();
+    Promise.all([
+      getPublishedContent("Video", { signal: controller.signal }),
+      getPublishedContent("Image", { signal: controller.signal }),
+    ])
+      .then(([videos, images]) => {
+        if (!controller.signal.aborted) setAvailableMedia([...videos, ...images]);
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) setError(loadError.message || "Could not load published media.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingAvailableMedia(false);
+      });
+    return () => controller.abort();
+  }, [showAddContent]);
 
   const createPlaylist = () => {
     setIsCreatingPlaylist(true);
@@ -204,10 +234,22 @@ export default function PlaylistDashboard() {
         playlist.id === activePlaylistId ? updated : playlist,
       ));
       setShowAddContent(false);
+      setSelectedContentId("");
       setError("");
     } catch (requestError) {
       setError(requestError.message);
     }
+  };
+
+  const toggleAddContentPicker = () => {
+    if (showAddContent) {
+      setShowAddContent(false);
+      return;
+    }
+    setError("");
+    setSelectedContentId("");
+    setIsLoadingAvailableMedia(true);
+    setShowAddContent(true);
   };
 
   const addNote = async () => {
@@ -261,6 +303,8 @@ export default function PlaylistDashboard() {
   };
 
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId);
+  const playlistContentIds = new Set((activePlaylist?.items || []).map((item) => String(item.id)));
+  const addableMedia = availableMedia.filter((item) => !playlistContentIds.has(String(item._id)));
   const activeMedia = (activePlaylist?.items || []).filter((item) =>
     item.title.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -302,6 +346,7 @@ export default function PlaylistDashboard() {
           activeMediaCount={activeMedia.length}
           activeNotesCount={activeNotes.length}
           addNote={addNote}
+          onAddContent={toggleAddContentPicker}
           openFullEdit={openFullEdit}
           deletePlaylist={deletePlaylist}
         />
@@ -316,14 +361,33 @@ export default function PlaylistDashboard() {
             </div>
           ) : activeTab === "media" ? (
             <>
-              <div className="mb-4 flex justify-end">
-              </div>
               {showAddContent && (
-                <div className="mb-5 flex flex-col gap-2 rounded-xl border border-white/10 p-4 sm:flex-row">
-                
+                <div className="mb-5 flex flex-col gap-3 rounded-xl border border-white/10 p-4 sm:flex-row">
+                  <label className="sr-only" htmlFor="playlist-content-select">Choose a video or image</label>
+                  <select
+                    id="playlist-content-select"
+                    value={selectedContentId}
+                    onChange={(event) => setSelectedContentId(event.target.value)}
+                    disabled={isLoadingAvailableMedia || addableMedia.length === 0}
+                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white disabled:opacity-60"
+                  >
+                    <option value="">
+                      {isLoadingAvailableMedia
+                        ? "Loading published videos and images..."
+                        : addableMedia.length
+                          ? "Choose a video or image"
+                          : "No published videos or images available"}
+                    </option>
+                    {addableMedia.map((item) => (
+                      <option key={item._id} value={item._id}>
+                        {item.type === "Video" ? "Video" : "Image"} — {item.title || "Untitled"}
+                      </option>
+                    ))}
+                  </select>
                   <button
+                    type="button"
                     onClick={addContent}
-                    disabled={!selectedContentId}
+                    disabled={!selectedContentId || isLoadingAvailableMedia}
                     className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   >
                     Add to playlist

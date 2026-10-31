@@ -27,8 +27,15 @@ export default function AddToPlaylistButton({
   const menuRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [playlists, setPlaylists] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const userId = user?._id || user?.id;
+  const normalizedUserId = userId ? String(userId) : null;
+  const [playlistState, setPlaylistState] = useState({ ownerId: null, items: [] });
+  const playlists = playlistState.ownerId === normalizedUserId ? playlistState.items : [];
+  const [loadState, setLoadState] = useState({ ownerId: null, loading: false });
+  const loading = Boolean(
+    normalizedUserId &&
+      (loadState.ownerId !== normalizedUserId || loadState.loading),
+  );
   const [addingId, setAddingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -36,22 +43,26 @@ export default function AddToPlaylistButton({
   const isSupported = contentType === "Video" || contentType === "Image";
 
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen || !normalizedUserId) return undefined;
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
     getMyPlaylists({ signal: controller.signal })
       .then((items) => {
-        if (!controller.signal.aborted) setPlaylists(items || []);
+        if (!controller.signal.aborted) {
+          setPlaylistState({ ownerId: normalizedUserId, items: items || [] });
+          setError("");
+          setSuccess("");
+        }
       })
       .catch((requestError) => {
         if (!controller.signal.aborted) setError(requestError.message || "Could not load your playlists.");
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoadState({ ownerId: normalizedUserId, loading: false });
+        }
       });
     return () => controller.abort();
-  }, [isOpen, user]);
+  }, [isOpen, normalizedUserId]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -100,6 +111,7 @@ export default function AddToPlaylistButton({
       ? below
       : Math.max(8, (rect?.top ?? 8) - menuHeight - 8);
     setPosition({ top, left });
+    setLoadState({ ownerId: normalizedUserId, loading: true });
     setError("");
     setSuccess("");
     setIsOpen(true);
@@ -114,9 +126,12 @@ export default function AddToPlaylistButton({
     setSuccess("");
     try {
       const updated = await addPlaylistContent(playlist._id, contentId);
-      setPlaylists((current) => current.map((item) => (
-        String(item._id) === String(updated._id) ? updated : item
-      )));
+      setPlaylistState((current) => ({
+        ownerId: normalizedUserId,
+        items: (current.ownerId === normalizedUserId ? current.items : []).map((item) => (
+          String(item._id) === String(updated._id) ? updated : item
+        )),
+      }));
       setSuccess(`Added to ${playlist.name}`);
     } catch (requestError) {
       setError(requestError.message || "Could not add this item to the playlist.");
@@ -163,16 +178,18 @@ export default function AddToPlaylistButton({
           {!loading && error && <p role="alert" className="py-2 text-xs text-rose-300">{error}</p>}
           {!loading && !error && playlists.length === 0 && (
             <div className="py-2">
-              <p className="text-xs text-slate-300">You haven’t created a playlist yet.</p>
+              <p className="text-xs text-slate-300">
+                {user ? "You haven’t created a playlist yet." : "Sign in to save this item to a playlist."}
+              </p>
               <Link
-                to="/playlists"
+                to={user ? "/playlists" : "/signup"}
                 onClick={(event) => {
                   event.stopPropagation();
                   setIsOpen(false);
                 }}
                 className="mt-2 inline-flex rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400"
               >
-                Create a playlist
+                {user ? "Create a playlist" : "Sign in"}
               </Link>
             </div>
           )}

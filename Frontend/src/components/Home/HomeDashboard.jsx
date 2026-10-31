@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Radio, TrendingUp, Users, Eye } from "lucide-react";
-import { C, StatCard } from "./HomeConstants";
+import { C } from "./homeTokens";
+import { StatCard } from "./HomePrimitives";
 
 export default function HomeDashboard() {
   const stats = [

@@ -2,12 +2,9 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import TweetCard from "../Tweet/TweetCard";
 import { getPublishedContent } from "../../api/contentApi";
-import {
-  C,
-  useHScroll,
-  ScrollButtons,
-  ChannelLabel,
-} from "./HomeConstants";
+import { C } from "./homeTokens";
+import useHScroll from "./useHScroll";
+import { ScrollButtons, ChannelLabel } from "./HomePrimitives";
 
 export default function HomePulseFeed() {
   const [pulseRef, scrollPulse] = useHScroll();

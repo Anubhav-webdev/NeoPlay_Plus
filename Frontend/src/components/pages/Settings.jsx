@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginSuccess } from '../../redux/slices/authSlice';
 import { uploadUserAvatar } from '../../api/mediaApi';
@@ -84,28 +84,24 @@ export default function NeoPlayDashboard() {
   const [avatarMessage, setAvatarMessage] = useState('');
 
   // Core Profile States (With protected initial assets)
-  const [profile, setProfile] = useState({
-    name: authUser?.name || "Your profile",
-    username: authUser?.username || "",
+  const [profileState, setProfileState] = useState({
+    name: "",
+    username: "",
     bio: "Digital architect & UI designer exploring interactive boundaries. Curating fresh digital media formats daily. 🌌",
     location: "Tokyo, Japan",
     tier: "Premium Pass",
-    avatar: authUser?.avatar || DEFAULT_AVATAR,
+    avatar: "",
     banner: DEFAULT_BANNER
   });
+  const profile = {
+    ...profileState,
+    name: profileState.name || authUser?.name || "Your profile",
+    username: profileState.username || authUser?.username || "",
+    avatar: profileState.avatar || authUser?.avatar || DEFAULT_AVATAR,
+  };
 
   const [isEditing, setIsEditing] = useState(false);
   const [editBuffer, setEditBuffer] = useState({ ...profile });
-
-  useEffect(() => {
-    if (!authUser) return;
-    setProfile((current) => ({
-      ...current,
-      name: authUser.name || current.name,
-      username: authUser.username || current.username,
-      avatar: authUser.avatar || current.avatar,
-    }));
-  }, [authUser]);
 
   const [isFollowing, setIsFollowing] = useState(true);
   const [isDark, setIsDark] = useState(true);
@@ -158,7 +154,7 @@ export default function NeoPlayDashboard() {
   };
 
   const saveProfile = () => {
-    setProfile({ ...editBuffer });
+    setProfileState({ ...editBuffer });
     setIsEditing(false);
   };
 
@@ -174,7 +170,7 @@ export default function NeoPlayDashboard() {
       const nextUser = { ...authUser, ...updatedUser, id: authUser?.id || updatedUser._id };
       dispatch(loginSuccess(nextUser));
       localStorage.setItem('loggedInUser', JSON.stringify(nextUser));
-      setProfile((current) => ({ ...current, avatar: updatedUser.avatar || DEFAULT_AVATAR }));
+      setProfileState((current) => ({ ...current, avatar: updatedUser.avatar || DEFAULT_AVATAR }));
       setEditBuffer((current) => ({ ...current, avatar: updatedUser.avatar || DEFAULT_AVATAR }));
       setAvatarMessage('Profile photo saved.');
     } catch (error) {

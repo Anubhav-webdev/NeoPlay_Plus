@@ -1,4 +1,3 @@
-import React from 'react';
 import { StickyNote, FileText, Edit2, Trash2, X, Save } from 'lucide-react';
 
 export default function NotesGrid({

@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import CreatorCard from "../cards/CreatorCards"; 
-import {
-  useHScroll,
-  ScrollButtons,
-  ChannelLabel,
-} from "./HomeConstants";
+import useHScroll from "./useHScroll";
+import { ScrollButtons, ChannelLabel } from "./HomePrimitives";
 
 import { getPublishedCreators } from "../../api/contentApi";
 

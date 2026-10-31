@@ -34,6 +34,15 @@ function pagination(query) {
   return { page, limit, skip: (page - 1) * limit };
 }
 
+async function canManageContent(user, content) {
+  if (user.role === "admin") return true;
+  const creator = await Creator.findOne({
+    userId: user._id,
+    applicationStatus: "approved",
+  }).select("_id");
+  return String(content.creatorId) === String(creator?._id);
+}
+
 // List published media with bounded pagination and optional filters.
 export const listContent = asyncHandler(async (req, res) => {
   const { page, limit, skip } = pagination(req.query);
@@ -224,11 +233,7 @@ export const updateContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
   const content = await Content.findById(req.params.contentId);
   if (!content) throw new ApiError(404, "Content not found");
-  const creator = await Creator.findOne({ userId: req.user._id });
-  if (
-    req.user.role !== "admin" &&
-    String(content.creatorId) !== String(creator?._id)
-  ) {
+  if (!(await canManageContent(req.user, content))) {
     throw new ApiError(403, "You cannot edit this content");
   }
 
@@ -267,9 +272,13 @@ export const updateContent = asyncHandler(async (req, res) => {
     }
   }
   if (content.mediaAssetId) {
+    const contentCreator = req.user.role === "admin"
+      ? await Creator.findById(content.creatorId).select("userId")
+      : null;
     const media = await MediaAsset.findOne({
       _id: content.mediaAssetId,
-      ownerId: req.user._id,
+      ownerId: contentCreator?.userId || req.user._id,
+      creatorId: content.creatorId,
       status: "ready",
     });
     if (
@@ -329,11 +338,7 @@ export const publishContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
   const content = await Content.findById(req.params.contentId);
   if (!content) throw new ApiError(404, "Content not found");
-  const creator = await Creator.findOne({ userId: req.user._id });
-  if (
-    req.user.role !== "admin" &&
-    String(content.creatorId) !== String(creator?._id)
-  ) {
+  if (!(await canManageContent(req.user, content))) {
     throw new ApiError(403, "You cannot publish this content");
   }
   if (content.type !== "Tweet" && !content.mediaUrl) {
@@ -356,11 +361,7 @@ export const archiveContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
   const content = await Content.findById(req.params.contentId);
   if (!content) throw new ApiError(404, "Content not found");
-  const creator = await Creator.findOne({ userId: req.user._id });
-  if (
-    req.user.role !== "admin" &&
-    String(content.creatorId) !== String(creator?._id)
-  ) {
+  if (!(await canManageContent(req.user, content))) {
     throw new ApiError(403, "You cannot archive this content");
   }
   content.status = "archived";

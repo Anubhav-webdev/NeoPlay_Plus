@@ -2,13 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoCard from "../Video/Videocard";
 import { getPublishedContent } from "../../api/contentApi";
-import {
-  C,
-  useHScroll,
-  ScrollButtons,
-  ChannelLabel,
-  CategoryPill,
-} from "./HomeConstants";
+import { C } from "./homeTokens";
+import useHScroll from "./useHScroll";
+import { ScrollButtons, ChannelLabel, CategoryPill } from "./HomePrimitives";
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },

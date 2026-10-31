@@ -1,4 +1,3 @@
-import React from 'react';
 import { LayoutGrid, Plus, Folder, Globe, Lock, Edit2, Trash2, Check, Search } from 'lucide-react';
 
 export default function Sidebar({

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX,
@@ -87,6 +87,17 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
       type: seconds > 0 ? 'forward' : 'rewind',
       id: Date.now()
     });
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    const player = playerContainerRef.current;
+    if (!player) return;
+
+    if (!document.fullscreenElement) {
+      player.requestFullscreen().catch(console.error);
+    } else {
+      document.exitFullscreen();
+    }
   }, []);
 
   // Auto-clear flash indicator cards safely
@@ -185,7 +196,7 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleTogglePlay, handleSkip]);
+  }, [handleTogglePlay, handleSkip, handleToggleFullscreen]);
 
   const handleWheel = (e) => {
     if (isFullscreen) e.preventDefault();
@@ -209,16 +220,6 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
     const sec = Math.floor(s % 60);
     if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  };
-
-  const handleToggleFullscreen = () => {
-    const el = playerContainerRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().catch(console.error);
-    } else {
-      document.exitFullscreen();
-    }
   };
 
   const handlePiP = async () => {

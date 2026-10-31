@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
@@ -54,35 +54,47 @@ export default function WatchHistory({
   onClearHistory
 }) {
   const user = useSelector((state) => state.auth.user);
-  const [history, setHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(Boolean(user));
+  const userId = user?._id || user?.id;
+  const normalizedUserId = userId ? String(userId) : null;
+  const [historyState, setHistoryState] = useState({ ownerId: null, items: [] });
+  const history = useMemo(
+    () => historyState.ownerId === normalizedUserId ? historyState.items : [],
+    [historyState, normalizedUserId],
+  );
+  const setHistory = useCallback((update) => {
+    setHistoryState((current) => {
+      const currentItems = current.ownerId === normalizedUserId ? current.items : [];
+      const items = typeof update === "function" ? update(currentItems) : update;
+      return { ownerId: normalizedUserId, items };
+    });
+  }, [normalizedUserId]);
+  const [loadedUserId, setLoadedUserId] = useState(null);
+  const loadingHistory = Boolean(user && normalizedUserId && loadedUserId !== normalizedUserId);
   const [historyError, setHistoryError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
+  const visibleHistoryError = loadedUserId === normalizedUserId ? historyError : "";
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("history");
   const [selectedIds, setSelectedIds] = useState([]);
 
   useEffect(() => {
-    if (!user) {
-      setHistory([]);
-      setLoadingHistory(false);
-      setHistoryError("");
-      return undefined;
-    }
+    if (!normalizedUserId) return undefined;
     const controller = new AbortController();
-    setLoadingHistory(true);
-    setHistoryError("");
 
     Promise.all([
       getMyWatchHistory({ signal: controller.signal }),
       getMyWishlist({ signal: controller.signal }).catch((error) => {
-        if (!controller.signal.aborted) setHistoryError(`Watch history loaded, but saved items failed: ${error.message}`);
-        return [];
+        return {
+          items: [],
+          warning: `Watch history loaded, but saved items failed: ${error.message}`,
+        };
       }),
     ])
-      .then(([records, wishlistRecords]) => {
+      .then(([records, wishlistResult]) => {
         if (controller.signal.aborted) return;
+        const wishlistRecords = Array.isArray(wishlistResult)
+          ? wishlistResult
+          : wishlistResult.items;
         const savedIds = new Set(
           wishlistRecords
             .filter((record) => record.contentId?._id)
@@ -106,16 +118,17 @@ export default function WatchHistory({
 
         setHistory([...watched, ...savedOnly]);
         setSelectedIds([]);
+        setHistoryError(Array.isArray(wishlistResult) ? "" : wishlistResult.warning);
       })
       .catch((error) => {
         if (!controller.signal.aborted) setHistoryError(error.message || "Could not load your watch history.");
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoadingHistory(false);
+        if (!controller.signal.aborted) setLoadedUserId(normalizedUserId);
       });
 
     return () => controller.abort();
-  }, [user, reloadKey]);
+  }, [normalizedUserId, setHistory]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(history.map((item) => item.category).filter(Boolean)));
@@ -358,7 +371,7 @@ export default function WatchHistory({
           )}
 
           {/* Content States */}
-          {historyError && <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{historyError}</p>}
+          {visibleHistoryError && <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{visibleHistoryError}</p>}
           
           {loadingHistory ? (
             <div role="status" className="flex items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#0D121B]/50 py-20 text-sm text-slate-400">

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Play } from "lucide-react";
 import { getPublishedContent } from "../../api/contentApi";
-import { C, FONT_DISPLAY } from "./HomeConstants";
+import { C, FONT_DISPLAY } from "./homeTokens";
 
 export default function HomeHeroSection() {
   const navigate = useNavigate();

@@ -99,10 +99,14 @@ export default function TrendingDashboard() {
 
   // Featured Hero Items
   const featuredVideo = videos[0];
-  // Remaining Items
-  const leftColumnItems = [...videos.slice(1, 3), ...images.slice(1, 2),...videos.slice(4, 7), ...images.slice(0, 2)];
+  // Distribute every non-featured media item across both columns exactly once.
+  const remainingMedia = [...videos.slice(1), ...images];
+  const leftColumnItems = remainingMedia.filter((_, index) => index % 2 === 0);
   const centerColumnTweets = tweets.slice(0, 3);
-  const rightColumnItems = [...images.slice(2, 4), ...tweets.slice(3, 5), ...images.slice(5, 7), ...tweets.slice(3, 5)];
+  const rightColumnItems = [
+    ...remainingMedia.filter((_, index) => index % 2 === 1),
+    ...tweets.slice(3),
+  ];
 
   return (
     <div className="min-h-screen bg-transparent text-[#171717] antialiased pb-16">
