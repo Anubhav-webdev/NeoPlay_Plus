@@ -8,12 +8,16 @@ build/
 !.env.example
 .env.local
 .env.*.local
+*.env
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 coverage/
-*.log
+uploads/
+tmp/
 .DS_Store
 .eslintcache
 
@@ -26,3 +30,4 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+desktop.ini

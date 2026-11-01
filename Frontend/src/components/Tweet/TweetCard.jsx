@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { formatTimeAgo } from "../common/formatTimeAgo";
+import { formatTimeAgo } from "../common/formatDate";
 import {
   FiMessageCircle,
   FiHeart,
   FiShare2,
-  FiMoreHorizontal,
+  FiMoreVertical,
   FiFlag,
   FiCheckCircle,
 } from "react-icons/fi";
@@ -115,7 +115,7 @@ export default function TweetCard({ tweet }) {
         <FaTwitter className="absolute -right-6 -bottom-6 text-purple-500/10 text-[150px] pointer-events-none select-none z-0 transform -rotate-12 transition-transform duration-500 group-hover:scale-105" />
 
         {/* Header */}
-        <div className="flex items-start justify-between relative z-10">
+        <div className="flex items-start justify-between relative z-10 ">
           <div className="flex items-center space-x-3.5">
             <img
               src={tweet.avatar}
@@ -133,7 +133,7 @@ export default function TweetCard({ tweet }) {
                 )}
               </div>
 
-              <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5">
+              <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5    min-w-64">
                 <span className="text-slate-500">@{tweet.handle}</span>
                 <span className="text-slate-700">•</span>
                 <span className="font-medium text-slate-400">
@@ -157,31 +157,23 @@ export default function TweetCard({ tweet }) {
           </div>
 
           {/* Menu Dropdown */}
-          <div className="relative">
+          <div className="relative right-4">
             <button
               onClick={() => setShowMenu(!showMenu)}
               title="More Options"
-              className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition"
+              className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition  absolute top-0"
             >
-              <FiMoreHorizontal size={18} />
+              <FiMoreVertical size={18} />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-44 bg-[#131722]/95 backdrop-blur-2xl rounded-2xl border border-purple-500/20 shadow-2xl z-20 overflow-hidden py-1.5">
-                {isFollowing && (
-                  <button
-                    onClick={toggleFollow}
-                    className="w-full text-left px-4 py-2.5 text-xs font-medium text-slate-300 hover:bg-white/[0.06] transition"
-                  >
-                    Unfollow @{tweet.handle}
-                  </button>
-                )}
+              <div className="absolute right-0 mt-2 w-44  backdrop-blur-2xl rounded-2xl border border-purple-500/20 shadow-2xl  overflow-hidden py-1.5  z-20 bg-black/90">
                 <button
                   onClick={() => {
                     setShowReport(true);
                     setShowMenu(false);
                   }}
-                  className="w-full text-left flex items-center space-x-2 px-4 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 transition"
+                  className="w-full text-left flex items-center space-x-2 px-4 py-2.5 text-xs font-medium text-red-400 group-hover:bg-red-500/10 transition "
                 >
                   <FiFlag size={13} />
                   <span>Report Post</span>
@@ -286,7 +278,7 @@ export default function TweetCard({ tweet }) {
 
         {/* Comments Section */}
         {showComments && (
-          <div className="mt-4 pt-3 border-t border-purple-500/10 relative z-10">
+          <div className="mt-4 pt-3 border-t border-purple-500/10 relative z-20">
             <CommentsCard
               contentId={tweet.isBackendContent ? tweet.id : undefined}
               onCountChange={setCommentsCount}

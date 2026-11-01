@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Lobster+Two:ital@1&family=Orbitron:wght@400..900&family=Splash&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Lobster+Two:ital@1&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Splash&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&family=Lobster+Two:ital@1&family=Orbitron:wght@400..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Splash&display=swap');
+
 
 :root {
   color-scheme: dark;
@@ -25,7 +27,7 @@
   font-family: "Lobster Two", cursive;
 }
 .all-font {
-  font-family: "Roboto",
+  font-family: "Giest",
 }
 .header-font {
   font-family: "Orbitron", "Lobster Two";

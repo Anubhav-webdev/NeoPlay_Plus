@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { FiCheckCircle, FiPlay, FiVideo } from "react-icons/fi";
-import { formatTimeAgo } from "../common/formatTimeAgo";
+import { formatTimeAgo } from "../common/formatDate";
 export default function VideoCard({ video, className = "" }) {
   const category = video.category || video.Catagory;
   const timeAgo = formatTimeAgo(video.time || video.createdAt);

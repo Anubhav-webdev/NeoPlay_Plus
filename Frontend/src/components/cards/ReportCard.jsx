@@ -1,7 +1,14 @@
+import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { FaFlag, FaTimes } from 'react-icons/fa';
 
-export default function ReportCard({ tweet, onClose, onSubmit }) {
+export default function ReportCard({
+  tweet,
+  contentType = 'Post',
+  creatorName,
+  onClose,
+  onSubmit,
+}) {
   const [reason, setReason] = useState('spam');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +36,7 @@ export default function ReportCard({ tweet, onClose, onSubmit }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-[#0f121d] border border-slate-800 rounded-3xl w-full max-w-md p-6 relative shadow-2xl">
         <button
@@ -44,12 +51,15 @@ export default function ReportCard({ tweet, onClose, onSubmit }) {
           <div className="p-3 bg-red-500/10 rounded-full">
             <FaFlag size={20} />
           </div>
-          <h2 className="text-xl font-bold">Report Post</h2>
+          <h2 className="text-xl font-bold">Report {contentType}</h2>
         </div>
 
         <p className="text-sm text-slate-400 mb-6">
-          You are reporting a post by <span className="font-bold text-slate-200">@{tweet.handle}</span>.
-          Please select a reason for this report.
+          You are reporting a {contentType.toLowerCase()} by{" "}
+          <span className="font-bold text-slate-200">
+            {creatorName || `@${tweet?.handle || "creator"}`}
+          </span>
+          {". Please select a reason for this report."}
         </p>
 
         <div className="space-y-2 mb-4">
@@ -91,6 +101,7 @@ export default function ReportCard({ tweet, onClose, onSubmit }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+coverage/
+uploads/
+tmp/
+logs/
+.env
+.env.*
+*.env

@@ -13,9 +13,9 @@ import { C } from "./homeTokens";
 import { ChannelLabel } from "./HomePrimitives";
 
 const tabs = [
-  { id: "videos", label: "Video Channel", icon: VideoIcon },
-  { id: "pulse", label: "Pulse Feed", icon: MessageCircle },
-  { id: "gallery", label: "Gallery", icon: ImageIcon },
+  { id: "videos", label: "NeoVideo", icon: VideoIcon },
+  { id: "pulse", label: "NeoFeed", icon: MessageCircle },
+  { id: "gallery", label: "NeoShots", icon: ImageIcon },
 ];
 
 const containerVariants = {
@@ -94,6 +94,7 @@ export default function HomeLineup({
             thumb: item.mediaUrl,
             src: item.mediaUrl,
             category: item.categoryIds?.[0]?.name || "General",
+            isBackendContent: true,
           })),
         });
         setError("");

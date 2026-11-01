@@ -61,6 +61,7 @@ export default function TrendingDashboard() {
                 contentType: "image",
                 thumb: item.mediaUrl,
                 src: item.mediaUrl,
+                 isBackendContent: true
               };
             }
             return {

@@ -17,8 +17,6 @@ export default function TweetsFeed() {
   const [showMediaOnly, setShowMediaOnly] = useState(false);
   const [publishedTweets, setPublishedTweets] = useState([]);
   const [feedError, setFeedError] = useState("");
-
-
   
   useEffect(() => {
     const controller = new AbortController();

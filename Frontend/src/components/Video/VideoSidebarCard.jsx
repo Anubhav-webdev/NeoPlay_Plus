@@ -1,7 +1,11 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
-import { FiMoreVertical, FiPlay } from "react-icons/fi";
+import { FiFlag, FiMoreVertical, FiPlay } from "react-icons/fi";
 import AddToPlaylistButton from "../Playlist/AddToPlaylistButton";
+import { reportContent } from "../../api/reportsApi";
+import ReportCard from "../cards/ReportCard";
 
 // Framer Motion variants
 const listContainerVariants = {
@@ -24,10 +28,15 @@ const cardVariants = {
 };
 
 export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
+  const user = useSelector((state) => state.auth.user);
+  const navigate = useNavigate();
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [reportingVideo, setReportingVideo] = useState(null);
+
   const handleMenuClick = (e, videoId) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log(`Open context menu for video ${videoId}`);
+    setOpenMenuId((openId) => (openId === videoId ? null : videoId));
   };
 
   return (
@@ -103,14 +112,35 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => handleMenuClick(e, item.id)}
-                    title="More options"
-                    className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-700/60 hover:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
-                  >
-                    <FiMoreVertical className="h-4 w-4" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => handleMenuClick(e, item.id)}
+                      title="More options"
+                      aria-label={`More options for ${item.title}`}
+                      aria-expanded={openMenuId === item.id}
+                      className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-700/60 hover:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                    >
+                      <FiMoreVertical className="h-4 w-4" />
+                    </button>
+                    {openMenuId === item.id && (
+                      <div className="absolute bottom-full right-0 z-30 mb-1 w-36 overflow-hidden rounded-lg border border-white/10 bg-slate-900 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenMenuId(null);
+                            setReportingVideo(item);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-300 transition hover:bg-white/10"
+                        >
+                          <FiFlag className="h-3.5 w-3.5" />
+                          Report video
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </Link>
@@ -123,6 +153,23 @@ export default function SidebarVideoCard({ relatedVideos = [], setIsPlaying }) {
           </p>
         )}
       </motion.div>
+      {reportingVideo && (
+        <ReportCard
+          tweet={{ handle: reportingVideo.channel }}
+          contentType="Video"
+          creatorName={reportingVideo.channel || "this creator"}
+          onClose={() => setReportingVideo(null)}
+          onSubmit={async (reason) => {
+            if (!user) {
+              navigate("/signup");
+              throw new Error("Sign in to report content.");
+            }
+            if (!reportingVideo.id) throw new Error("This video is not available for reporting.");
+            await reportContent(reportingVideo.id, reason);
+            setReportingVideo(null);
+          }}
+        />
+      )}
     </aside>
   );
 }
