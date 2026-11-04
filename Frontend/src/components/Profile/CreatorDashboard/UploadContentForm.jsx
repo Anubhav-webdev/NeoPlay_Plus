@@ -29,6 +29,11 @@ export default function UploadContentForm({
   handlePublishAsset,
   isPublishing,
   uploadStatus,
+  uploadPercent,
+  uploadChunkProgress,
+  maxUploadBytes,
+  maxVideoDurationSeconds,
+  largeVideoCompressionThresholdBytes,
 }) {
   const thumbnailPreview = useFilePreviewUrl(thumbnailFile);
 
@@ -156,7 +161,11 @@ export default function UploadContentForm({
             <span className="text-[10px] font-medium tracking-wide text-slate-400">
               {isTweet ? "Select an image or video attachment" : `Select a ${contentType}`}
             </span>
-            {selectedFile && <span className="mt-1 break-all text-[10px] font-bold text-purple-400">{selectedFile.name}</span>}
+            {selectedFile && (
+              <span className="mt-1 break-all text-[10px] font-bold text-purple-400">
+                {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(1)} MiB)
+              </span>
+            )}
             <input
               type="file"
               accept={acceptedFiles}
@@ -166,8 +175,22 @@ export default function UploadContentForm({
             />
           </label>
           <p className="text-[10px] text-slate-500">
+            {maxUploadBytes
+              ? `Maximum file size: ${(maxUploadBytes / (1024 * 1024)).toFixed(0)} MiB. `
+              : ""}
+            {contentType === "video" && maxVideoDurationSeconds
+              ? `Videos up to ${Math.floor(maxVideoDurationSeconds / 60)} minutes. `
+              : ""}
             {isTweet ? "Attachments are verified before they are stored." : "Media is checked for duplicates before publishing."}
           </p>
+          {selectedFile &&
+            largeVideoCompressionThresholdBytes &&
+            selectedFile.size > largeVideoCompressionThresholdBytes &&
+            (contentType === "video" || selectedFile.type.startsWith("video/")) && (
+              <p className="text-[10px] text-amber-300">
+                Large video: stronger compression is applied after upload to reduce stored size. It does not speed up the initial upload from your device.
+              </p>
+            )}
         </motion.div>
 
         {contentType === "video" && (
@@ -239,9 +262,30 @@ export default function UploadContentForm({
               </div>
               <span className="text-[10px] font-semibold text-purple-400">Please wait</span>
             </div>
-            <div role="progressbar" aria-label="Saving content" aria-valuetext="Upload in progress" className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-              <motion.div className="h-full w-1/3 rounded-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-400" animate={{ x: ["-100%", "300%"] }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+            <div
+              role="progressbar"
+              aria-label={uploadPercent === null ? "Processing content" : "Uploading file"}
+              aria-valuemin={uploadPercent === null ? undefined : 0}
+              aria-valuemax={uploadPercent === null ? undefined : 100}
+              aria-valuenow={uploadPercent ?? undefined}
+              aria-valuetext={uploadPercent === null ? uploadStatus || "Processing" : `${uploadPercent}% uploaded`}
+              className="h-2 w-full overflow-hidden rounded-full bg-slate-800"
+            >
+              {uploadPercent === null ? (
+                <motion.div className="h-full w-1/3 rounded-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-400" animate={{ x: ["-100%", "300%"] }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+              ) : (
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-400 transition-[width]"
+                  style={{ width: `${uploadPercent}%` }}
+                />
+              )}
             </div>
+            {uploadChunkProgress?.mode === "chunked" && (
+              <p className="text-right text-[10px] text-slate-400">
+                Uploading chunk {uploadChunkProgress.chunkIndex} of {uploadChunkProgress.totalChunks}
+              </p>
+            )}
+            {uploadPercent !== null && <p className="text-right text-[10px] font-semibold text-purple-300">{uploadPercent}% uploaded</p>}
           </motion.div>
         )}
 

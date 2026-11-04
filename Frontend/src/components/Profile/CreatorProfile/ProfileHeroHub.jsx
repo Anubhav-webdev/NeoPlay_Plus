@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle, Calendar, Sparkles } from 'lucide-react';
+import { CheckCircle, Calendar, Sparkles,LayoutDashboard } from 'lucide-react';
 
 const pulseGlow = {
   animate: {
@@ -8,7 +8,6 @@ const pulseGlow = {
     transition: { duration: 6, repeat: Infinity, ease: 'easeInOut' }
   }
 };
-
 const GradientBadge = ({ children, color = 'purple' }) => {
   const colorMap = {
     purple: 'from-purple-500/20 to-indigo-500/20 text-purple-300 border-purple-500/30',
@@ -28,6 +27,7 @@ export default function ProfileHeroHub({
   onToggleSubscription,
   subscriptionBusy = false,
   subscriberCount,
+  publishedContentCount,
 }) {
   const joinedDate = channelIdentity.createdAt
     ? new Date(channelIdentity.createdAt).toLocaleDateString()
@@ -36,14 +36,14 @@ export default function ProfileHeroHub({
     <div className="relative rounded-[24px] overflow-hidden bg-slate-950 border border-slate-800/80 shadow-2xl ">
       {/* Cover Banner Element */}
       <div 
-        className="h-48 sm:h-64 relative overflow-hidden bg-cover bg-center bg-slate-900"
+        className="h-40 sm:h-56 relative overflow-hidden bg-cover bg-center bg-slate-900"
         style={channelIdentity.banner ? { backgroundImage: `url(${channelIdentity.banner})` } : undefined}
       >
         <motion.div variants={pulseGlow} animate="animate" className="absolute inset-0 bg-[radial-gradient(circle_at_70%_120%,rgba(0,0,0,0.4),transparent_70%)]" />
       </div>
 
       {/* Context Information Info Block */}
-      <div className="px-6 sm:px-8 pb-8 relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-16">
+      <div className="px-6 sm:px-8 pb-4 relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-26 sm:-mt-20">
         {/* Custom Cyber Avatar Container */}
         <div className="relative flex-shrink-0">
           <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500 opacity-75 blur-md animate-pulse" />
@@ -59,30 +59,34 @@ export default function ProfileHeroHub({
         </div>
 
         {/* Profile Identity Data Fields */}
-        <div className="flex-1 space-y-3 text-center md:text-left pt-2 md:pt-4 w-full">
+        <div className="flex-1 space-y-3 text-center md:text-left pt-2 md:pt-2 w-full">
           <div className="flex items-center justify-center md:justify-start gap-3 flex-wrap">
             <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-300 bg-clip-text text-transparent sidebar-font font-stretch-50%">{channelIdentity.name}</h1>
             {channelIdentity.isVerified && <CheckCircle className="w-5 h-5 text-blue-400 fill-blue-500/15" />}
             <GradientBadge color="cyan">Creator</GradientBadge>
           </div>
-          <p className="text-purple-400 text-sm">@{channelIdentity.handle}</p>
-          {channelIdentity.tagline && <p className="text-purple-300 text-sm font-semibold">{channelIdentity.tagline}</p>}
+          
+         <div className='flex justify-around items-center gap-6 sm:inline' ><p className="text-purple-400 text-sm ">@{channelIdentity.handle}</p>
+          {channelIdentity.tagline && <p className="text-purple-300 text-sm font-semibold">{channelIdentity.tagline}</p>}</div>
           {channelIdentity.bio && (
             <p className="text-slate-300 max-w-2xl text-sm sm:text-base leading-relaxed mx-auto md:mx-0 font-normal">
               {channelIdentity.bio}
             </p>
           )}
-          
-          <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs  text-slate-400 pt-1">
-            {joinedDate && <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-purple-400" /> Joined {joinedDate}</span>}
+       
+          <div className="flex flex-wrap justify-center md:justify-start gap-3 text-xs  text-slate-400 pt-1">
+            {joinedDate && <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-purple-400" />{joinedDate}</span>}
             {subscriberCount !== null && subscriberCount !== undefined && (
               <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-cyan-400" /> {subscriberCount} subscribers</span>
+            )}
+            {publishedContentCount !== null && publishedContentCount !== undefined && (
+              <span className="flex items-center gap-1.5"><LayoutDashboard className="w-4 h-4 text-lime-400" /> {publishedContentCount} published</span>
             )}
           </div>
         </div>
 
         {/* Subscriptions Activation Processor Toggle */}
-        <div className="w-full md:w-auto pt-4 md:pt-0 flex-shrink-0">
+        <div className="w-full md:w-auto  flex-shrink-0">
           <button 
             onClick={onToggleSubscription}
             disabled={subscriptionBusy}

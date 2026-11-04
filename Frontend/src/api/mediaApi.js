@@ -40,17 +40,72 @@ async function refreshAccessToken() {
 }
 
 export async function apiFetch(path, options = {}) {
+  const { onUploadProgress, ...requestOptions } = options;
   let token =
     sessionStorage.getItem("accessToken") || (await refreshAccessToken());
-  const send = () =>
-    fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      credentials: "include",
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${token}`,
-      },
+  const send = () => {
+    const headers = {
+      ...requestOptions.headers,
+      Authorization: `Bearer ${token}`,
+    };
+    if (!onUploadProgress) {
+      return fetch(`${API_BASE_URL}${path}`, {
+        ...requestOptions,
+        credentials: "include",
+        headers,
+      });
+    }
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const signal = requestOptions.signal;
+      const cleanup = () => {
+        signal?.removeEventListener("abort", abortRequest);
+      };
+      const abortRequest = () => xhr.abort();
+
+      xhr.open(requestOptions.method || "GET", `${API_BASE_URL}${path}`);
+      xhr.withCredentials = true;
+      for (const [name, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(name, value);
+      }
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          onUploadProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      });
+      xhr.addEventListener("load", () => {
+        cleanup();
+        resolve({
+          ok: xhr.status >= 200 && xhr.status < 300,
+          status: xhr.status,
+          json: async () => {
+            try {
+              return JSON.parse(xhr.responseText || "{}");
+            } catch {
+              return {};
+            }
+          },
+        });
+      });
+      xhr.addEventListener("error", () => {
+        cleanup();
+        reject(new Error("Network error while uploading the file."));
+      });
+      xhr.addEventListener("abort", () => {
+        cleanup();
+        const error = new Error("The upload was cancelled.");
+        error.name = "AbortError";
+        reject(error);
+      });
+      if (signal?.aborted) {
+        abortRequest();
+        return;
+      }
+      signal?.addEventListener("abort", abortRequest, { once: true });
+      xhr.send(requestOptions.body ?? null);
     });
+  };
 
   let response = await send();
   if (response.status === 401) {
@@ -106,25 +161,162 @@ export async function applyAsCreator(profile) {
   return result.data.creator;
 }
 
-export async function uploadMedia(file) {
+const uploadResumeKey = (file) =>
+  `neoplay:media-upload:${encodeURIComponent(file.name)}:${file.size}:${file.lastModified}`;
+
+async function hashChunk(chunk) {
+  const digest = await crypto.subtle.digest("SHA-256", await chunk.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function uploadMediaInChunks(file, onProgress) {
+  const resumeKey = uploadResumeKey(file);
+  let uploadId = localStorage.getItem(resumeKey);
+  let upload;
+  if (uploadId) {
+    try {
+      const result = await apiFetch(
+        `/media/uploads/${encodeURIComponent(uploadId)}`,
+        { cache: "no-store" },
+      );
+      upload = result.data.upload;
+      if (upload.status === "failed") {
+        localStorage.removeItem(resumeKey);
+        upload = null;
+        uploadId = null;
+      }
+      if (upload && upload.status !== "receiving") {
+        return { uploadId };
+      }
+      if (upload && upload.uploadSize !== file.size) {
+        upload = null;
+      }
+    } catch (error) {
+      if (error.status !== 404) throw error;
+      upload = null;
+    }
+    if (!upload) {
+      localStorage.removeItem(resumeKey);
+      uploadId = null;
+    }
+  }
+
+  if (!uploadId) {
+    const result = await apiFetch("/media/uploads/initiate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+      }),
+    });
+    upload = result.data;
+    uploadId = upload.uploadId;
+    localStorage.setItem(resumeKey, uploadId);
+  }
+
+  const chunkSize = upload.uploadChunkSize || upload.chunkSize;
+  const totalChunks = upload.totalChunks || Math.ceil(file.size / chunkSize);
+  const received = new Set(upload.receivedChunks || []);
+  const receivedHashes = new Map(
+    (upload.chunkHashes || []).map(({ index, sha256 }) => [index, sha256]),
+  );
+  let restartUpload = false;
+
+  for (let index = 0; index < totalChunks; index += 1) {
+    const start = index * chunkSize;
+    const chunk = file.slice(start, Math.min(file.size, start + chunkSize));
+    const sha256 = await hashChunk(chunk);
+    if (received.has(index)) {
+      if (receivedHashes.get(index) === sha256) continue;
+      restartUpload = true;
+      break;
+    }
+
+    await apiFetch(
+      `/media/uploads/${encodeURIComponent(uploadId)}/chunks/${index}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Chunk-SHA256": sha256,
+        },
+        body: chunk,
+        onUploadProgress: (chunkPercent) => {
+          const percent = Math.floor(
+            ((index + chunkPercent / 100) / totalChunks) * 100,
+          );
+          onProgress?.({
+            percent,
+            chunkIndex: index + 1,
+            totalChunks,
+            mode: "chunked",
+          });
+        },
+      },
+    );
+    received.add(index);
+    receivedHashes.set(index, sha256);
+    onProgress?.({
+      percent: Math.floor((received.size / totalChunks) * 100),
+      chunkIndex: index + 1,
+      totalChunks,
+      mode: "chunked",
+    });
+  }
+
+  if (restartUpload) {
+    await apiFetch(`/media/uploads/${encodeURIComponent(uploadId)}`, {
+      method: "DELETE",
+    });
+    localStorage.removeItem(resumeKey);
+    return uploadMediaInChunks(file, onProgress);
+  }
+
+  await apiFetch(`/media/uploads/${encodeURIComponent(uploadId)}/finalize`, {
+    method: "POST",
+  });
+  return { uploadId, resumeKey };
+}
+
+export async function uploadMedia(file, onProgress) {
+  if (file.type.startsWith("video/")) {
+    return uploadMediaInChunks(file, onProgress);
+  }
   const formData = new FormData();
   formData.append("file", file);
   const result = await apiFetch("/media/uploads", {
     method: "POST",
     body: formData,
+    onUploadProgress: (percent) =>
+      onProgress?.({ percent, chunkIndex: 1, totalChunks: 1, mode: "single" }),
   });
+  return result.data;
+}
+
+export function clearMediaUploadResume(file) {
+  if (file?.type.startsWith("video/")) {
+    localStorage.removeItem(uploadResumeKey(file));
+  }
+}
+
+export async function getMediaUploadLimits({ signal } = {}) {
+  const result = await apiFetch("/media/limits", { signal });
   return result.data;
 }
 
 // Video work runs in a separate worker, so the UI polls the owner-scoped status endpoint.
 export async function waitForMediaUpload(uploadId, onStatus = () => {}) {
-  const deadline = Date.now() + 10 * 60 * 1000;
+  const deadline = Date.now() + 60 * 60 * 1000;
   const startedAt = Date.now();
   const statusMessages = {
     receiving: "Upload received; waiting for the media worker.",
     queued: "Upload queued for verification.",
     checking: "Checking the file and looking for duplicates.",
-    processing: "Processing media on the server.",
+    processing: "Processing media on the server. Large videos can take several minutes.",
   };
 
   while (Date.now() < deadline) {
@@ -160,7 +352,7 @@ export async function waitForMediaUpload(uploadId, onStatus = () => {}) {
     await new Promise((resolve) => window.setTimeout(resolve, 2000));
   }
   throw new Error(
-    "Upload is still processing. Check that the media worker and Redis are running."
+    "Upload is still processing after an hour. Check the media worker logs and Redis before retrying."
   );
 }
 export async function createContent(payload) {
@@ -210,8 +402,15 @@ export async function getDuplicateReviewQueue({ signal } = {}) {
   return result.data.uploads;
 }
 
-export async function getCreatorApplications({ signal } = {}) {
-  const result = await apiFetch("/admin/creator-applications", { signal });
+export async function getDuplicateReviewQueuePage({ page = 1, limit = 25, signal } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const result = await apiFetch(`/media/duplicate-reviews?${params}`, { signal });
+  return result.data;
+}
+
+export async function getCreatorApplications({ status = "pending", signal } = {}) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const result = await apiFetch(`/admin/creator-applications${query}`, { signal });
   return result.data.creators;
 }
 

@@ -4,10 +4,10 @@ import { loginSuccess } from '../../redux/slices/authSlice';
 import { uploadUserAvatar } from '../../api/mediaApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Users, Bell, Sliders, Trophy, 
+  Users, Bell, Sliders,
   CheckCircle, Shield, Calendar, MapPin, Heart, MessageSquare, 
   Share2, Play, Image, FolderPlus, Clock,
-  Tv, Eye, ChevronRight, UserMinus, ExternalLink, Moon, Sun,
+  Tv, Eye, ChevronRight, UserMinus, ExternalLink,
   Sparkles, Award, Camera, Save, X, Upload
 } from 'lucide-react';
 import { FiTwitter } from "react-icons/fi";
@@ -104,9 +104,7 @@ export default function NeoPlayDashboard() {
   const [editBuffer, setEditBuffer] = useState({ ...profile });
 
   const [isFollowing, setIsFollowing] = useState(true);
-  const [isDark, setIsDark] = useState(true);
   const [aiLevel, setAiLevel] = useState(75);
-  const [quality, setQuality] = useState('480p');
   const [settings, setSettings] = useState({ comments: true, replies: true, likes: false, uploads: true });
 
   const [subs, setSubs] = useState([
@@ -119,7 +117,6 @@ export default function NeoPlayDashboard() {
   const statItems = [
     { label: 'Videos Watched', val: '1,420', icon: Play, color: 'text-purple-400', bg: 'bg-purple-500/10' },
     { label: 'Images Viewed', val: '8,941', icon: Image, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-    { label: 'Tweets Read', val: '3,219', icon: FiTwitter, color: 'text-blue-400', bg: 'bg-blue-500/10' },
     { label: 'Likes Given', val: '12.4k', icon: Heart, color: 'text-pink-400', bg: 'bg-pink-500/10' },
     { label: 'Comments Left', val: '482', icon: MessageSquare, color: 'text-amber-400', bg: 'bg-amber-500/10' },
     { label: 'Content Shares', val: '956', icon: Share2, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
@@ -397,7 +394,7 @@ export default function NeoPlayDashboard() {
             {/* CURATED RECOMMENDATIONS CONTENT */}
             <div className="space-y-4">
               <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-400" /> Suggested Media Pipeline
+                <Sparkles className="w-4 h-4 text-purple-400" /> Curated Recommendations
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {recommendations.map((rec, idx) => (
@@ -425,7 +422,7 @@ export default function NeoPlayDashboard() {
             {/* SUBSCRIPTIONS PIPELINE HUB */}
             <div className="space-y-4">
               <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-cyan-400" /> Active Channel Syncs
+                <Users className="w-4 h-4 text-cyan-400" />Followed Channels
               </h2>
               <AnimatePresence mode="popLayout">
                 {subs.length > 0 ? (
@@ -483,34 +480,8 @@ export default function NeoPlayDashboard() {
                 <h3 className="font-bold text-base text-slate-200">Terminal Control Layout</h3>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-semibold text-slate-300">Operational Theme</h4>
-                  <p className="text-[11px] text-slate-500">Visual runtime workspace</p>
-                </div>
-                <button 
-                  onClick={() => setIsDark(!isDark)}
-                  className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 text-xs font-medium"
-                >
-                  {isDark ? <Moon className="w-3.5 h-3.5 text-purple-400" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
-                  {isDark ? 'Dark Mode' : 'Light Mode'}
-                </button>
-              </div>
+     
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Media Frame Target</label>
-                <select 
-                  value={quality} 
-                  onChange={(e) => setQuality(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/60"
-                >
-                  <option>2160p Cinematic (4K)</option>
-                  <option>1080p Ultra</option>
-                  <option>720p</option>
-                  <option>480p</option>
-                  <option>Auto</option>
-                </select>
-              </div>
 
               <div className="space-y-2 pt-2 border-t border-slate-800/60">
                 <div className="flex justify-between items-center">
@@ -543,45 +514,6 @@ export default function NeoPlayDashboard() {
                 ))}
               </div>
             </GlassCard>
-
-            {/* TIER ACCOMPLISHMENTS WIDGET */}
-            <GlassCard className="space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-800/60 pb-3">
-                <Trophy className="w-4 h-4 text-emerald-400" />
-                <h3 className="font-bold text-base text-slate-200">Tier Core Accomplishments</h3>
-              </div>
-              <div className="space-y-3 max-h-72 overflow-scroll scrollbar-none">
-                {badges.map((badge, idx) => {
-                  const isComplete = badge.progress === 100;
-                  return (
-                    <div key={idx} className="bg-slate-950/40 border border-slate-800/60 p-3 rounded-xl space-y-2">
-                      <div className="flex gap-2.5 items-center">
-                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${badge.bg}`}>
-                          <badge.icon className={`w-4 h-4 ${badge.col}`} />
-                        </div>
-                        <div className="space-y-0.5 min-w-0 flex-1">
-                          <h4 className="font-bold text-slate-200 text-xs truncate">{badge.title}</h4>
-                          <p className="text-[10px] text-slate-500 truncate">{badge.desc}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center text-[10px] font-semibold">
-                          <span className={isComplete ? 'text-emerald-400' : 'text-purple-400'}>{badge.status}</span>
-                          <span className="text-slate-500">{badge.progress}%</span>
-                        </div>
-                        <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden">
-                          <div 
-                            style={{ width: `${badge.progress}%` }}
-                            className={`h-full rounded-full bg-gradient-to-r ${isComplete ? 'from-emerald-500 to-teal-400' : 'from-purple-500 to-blue-500'}`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </GlassCard>
-
           </div>
         </div>
       </div>

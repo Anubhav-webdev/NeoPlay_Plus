@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { createContent, uploadMedia, waitForMediaUpload } from '../../../../api/mediaApi.js';
+import { useEffect, useState } from 'react';
+import {
+  createContent,
+  clearMediaUploadResume,
+  getMediaUploadLimits,
+  uploadMedia,
+  waitForMediaUpload,
+} from '../../../../api/mediaApi.js';
 import { mapContentToCatalog } from '../contentCatalogUtils.js';
 
 const emptyUpload = { uploadId: null, assetId: null, mediaType: null };
@@ -18,6 +24,23 @@ export default function useCreatorPublisher({ categories, setContentCatalog, sho
   const [thumbnailUpload, setThumbnailUpload] = useState(emptyUpload);
   const [isPublishing, setIsPublishing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadPercent, setUploadPercent] = useState(null);
+  const [uploadChunkProgress, setUploadChunkProgress] = useState(null);
+  const [uploadLimits, setUploadLimits] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getMediaUploadLimits({ signal: controller.signal })
+      .then((limits) => {
+        if (!controller.signal.aborted) setUploadLimits(limits);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          showToast(error.message || 'Could not load upload limits.', 'red');
+        }
+      });
+    return () => controller.abort();
+  }, [showToast]);
 
   const updateForm = (field) => (value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -46,9 +69,21 @@ export default function useCreatorPublisher({ categories, setContentCatalog, sho
       showToast('Choose a thumbnail image for the video.', 'red');
       return;
     }
+    if (uploadLimits?.maxBytes) {
+      const oversizedFile = [mediaFile, form.thumbnailFile]
+        .filter(Boolean)
+        .find((file) => file.size > uploadLimits.maxBytes);
+      if (oversizedFile) {
+        const maxMegabytes = Math.floor(uploadLimits.maxBytes / (1024 * 1024));
+        showToast(`${oversizedFile.name} exceeds the ${maxMegabytes} MB upload limit.`, 'red');
+        return;
+      }
+    }
 
     setIsPublishing(true);
     setUploadStatus('Preparing upload');
+    setUploadPercent(null);
+    setUploadChunkProgress(null);
     let failedUploadKind = null;
 
     try {
@@ -57,7 +92,13 @@ export default function useCreatorPublisher({ categories, setContentCatalog, sho
       if (!mediaAssetId && mediaFile) {
         let uploadId = mediaUpload.uploadId;
         if (!uploadId) {
-          const queued = await uploadMedia(mediaFile);
+          setUploadStatus(`Uploading ${form.type} to the server`);
+          const queued = await uploadMedia(mediaFile, (progress) => {
+            setUploadPercent(progress.percent);
+            setUploadChunkProgress(progress);
+          });
+          setUploadPercent(null);
+          setUploadChunkProgress(null);
           uploadId = queued.uploadId;
           setMediaUpload((current) => ({ ...current, uploadId }));
         }
@@ -93,7 +134,13 @@ export default function useCreatorPublisher({ categories, setContentCatalog, sho
         if (!thumbnailAssetId) {
           let uploadId = thumbnailUpload.uploadId;
           if (!uploadId) {
-            const queued = await uploadMedia(form.thumbnailFile);
+            setUploadStatus('Uploading video thumbnail to the server');
+            const queued = await uploadMedia(form.thumbnailFile, (progress) => {
+              setUploadPercent(progress.percent);
+              setUploadChunkProgress(progress);
+            });
+            setUploadPercent(null);
+            setUploadChunkProgress(null);
             uploadId = queued.uploadId;
             setThumbnailUpload((current) => ({ ...current, uploadId }));
           }
@@ -148,8 +195,11 @@ export default function useCreatorPublisher({ categories, setContentCatalog, sho
       setMediaUpload(emptyUpload);
       setThumbnailUpload(emptyUpload);
       setUploadStatus('');
+      clearMediaUploadResume(mediaFile);
       showToast(form.publishMode === 'public' ? 'Content published.' : 'Draft saved.', 'green');
     } catch (error) {
+      setUploadPercent(null);
+      setUploadChunkProgress(null);
       if (['duplicate', 'failed'].includes(error.uploadStatus)) {
         if (failedUploadKind === 'thumbnail') {
           setThumbnailUpload(emptyUpload);
@@ -175,6 +225,9 @@ export default function useCreatorPublisher({ categories, setContentCatalog, sho
     setPublishMode: updateForm('publishMode'),
     isPublishing,
     uploadStatus,
+    uploadPercent,
+    uploadChunkProgress,
+    uploadLimits,
     resetMediaUploadState,
     resetThumbnailUploadState,
     handlePublishAsset,

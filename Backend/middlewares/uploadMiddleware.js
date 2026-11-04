@@ -1,4 +1,5 @@
 import multer from "multer";
+import express from "express";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -45,7 +46,7 @@ const profileImageParser = multer({
 function receiveSingleFile(uploadParser, maxBytes) {
   const parseFile = uploadParser.single("file");
   return (req, res, next) => {
-    parseFile(req, res, (error) => {
+    parseFile(req, res, async (error) => {
       if (!error) return next();
       const isMulterError = error instanceof multer.MulterError;
       const statusCode = isMulterError
@@ -57,7 +58,11 @@ function receiveSingleFile(uploadParser, maxBytes) {
           : "Invalid multipart upload"
         : undefined;
       if (req.file?.path) {
-        fs.rm(req.file.path, { force: true }).catch(() => {});
+        try {
+          await fs.rm(req.file.path, { force: true });
+        } catch (cleanupError) {
+          return next(cleanupError);
+        }
       }
       if (statusCode) return next(new ApiError(statusCode, message));
       return next(error);
@@ -67,6 +72,19 @@ function receiveSingleFile(uploadParser, maxBytes) {
 
 // Upload metadata is untrusted; the route verifies file signatures after parsing.
 export const receiveMediaFile = receiveSingleFile(parser, mediaConfig.maxBytes);
+const chunkParser = express.raw({
+  type: "application/octet-stream",
+  limit: mediaConfig.uploadChunkBytes,
+});
+export function receiveMediaChunk(req, res, next) {
+  chunkParser(req, res, (error) => {
+    if (!error) return next();
+    if (error.type === "entity.too.large") {
+      return next(new ApiError(413, "Upload chunk exceeds the configured chunk size"));
+    }
+    return next(error);
+  });
+}
 export const receiveProfileImageFile = receiveSingleFile(
   profileImageParser,
   5 * 1024 * 1024,

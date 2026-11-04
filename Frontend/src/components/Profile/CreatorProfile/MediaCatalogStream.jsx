@@ -64,7 +64,7 @@ case "tweet":
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
           <input 
             type="text" 
-            placeholder="Filter pipeline tokens..." 
+            placeholder="Search content..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-purple-500/40 focus:border-purple-500/40 transition"
@@ -72,23 +72,24 @@ case "tweet":
         </div>
       </div>
 
-      {/* DYNAMIC REGISTER MATRIX CATALOG MEDIA GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <AnimatePresence mode="popLayout">
-          {filteredCatalog.map((item) => (
-            <motion.div 
-              key={item.id} 
-              layout
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
-              transition={{ type: 'spring', stiffness: 380, damping: 35 }}
-            >
-              {renderCardComponent(item)}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+{/* DYNAMIC REGISTER MATRIX CATALOG MEDIA GRID */}
+<div className="grid grid-cols-1 sm:grid-cols-3 auto-rows-[300px] gap-6">
+  <AnimatePresence mode="popLayout">
+    {filteredCatalog.map((item) => (
+      <motion.div
+        key={item.id}
+        layout
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
+        transition={{ type: 'spring', stiffness: 380, damping: 35 }}
+        className="h-full w-full overflow-hidden rounded-2xl [&>*]:h-full [&>*]:w-full"
+      >
+        {renderCardComponent(item)}
+      </motion.div>
+    ))}
+  </AnimatePresence>
+</div>
 
       {/* Empty Configuration Registry Fallback View */}
       {isStreamEmpty && (

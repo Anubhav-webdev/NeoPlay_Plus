@@ -65,7 +65,7 @@ export default function useCreatorCatalogActions({ categories, setContentCatalog
       setContentCatalog((items) => items.map((item) => (
         item.id === contentId ? { ...item, status: published.status || 'published' } : item
       )));
-      showToast('Draft published.', 'green');
+      showToast('Content published.', 'green');
     } catch (error) {
       showToast(error.message || 'Could not publish this draft.', 'red');
     } finally {
@@ -78,7 +78,9 @@ export default function useCreatorCatalogActions({ categories, setContentCatalog
     setDeletingContentId(contentId);
     try {
       await archiveContent(contentId);
-      setContentCatalog((items) => items.filter((item) => item.id !== contentId));
+      setContentCatalog((items) => items.map((item) => (
+        item.id === contentId ? { ...item, status: 'archived' } : item
+      )));
       showToast('Content archived.', 'green');
     } catch (error) {
       showToast(error.message || 'Could not archive content.', 'red');

@@ -5,6 +5,7 @@ import { Worker } from "bullmq";
 import { DB_NAME } from "./Constents.js";
 import { MEDIA_QUEUE_NAME } from "./services/mediaQueue.js";
 import MediaAsset from "./models/MediaAsset.js";
+import MediaDuplicateEvent from "./models/MediaDuplicateEvent.js";
 import { mediaConfig } from "./config/media.js";
 import {
   deleteStagedAsset,
@@ -12,6 +13,7 @@ import {
   processMediaAsset,
 } from "./services/mediaProcessingService.js";
 import { deleteCloudinaryAsset } from "./services/cloudinaryService.js";
+import { removeOrphanedTempFiles } from "./services/mediaTempCleanup.js";
 
 if (!process.env.DB_URL) throw new Error("DB_URL is required by the media worker");
 if (!process.env.REDIS_URL) throw new Error("REDIS_URL is required by the media worker");
@@ -63,40 +65,75 @@ worker.on("error", (error) => {
   console.error("Media worker runtime error", error);
 });
 
-// Remove staged files when moderator review has expired or an upload was orphaned.
+// Remove staged files when moderator review has expired or an upload has aged out.
 async function cleanExpiredMedia() {
   const now = new Date();
   const expiredReviews = await MediaAsset.find({
     status: "review_required",
     expiresAt: { $lte: now },
-  }).select("+stagedPath");
+  }).select("+stagedPath +chunkDirectory");
   for (const asset of expiredReviews) {
     await deleteStagedAsset(asset);
     await asset.deleteOne();
   }
 
-  const orphanedUploads = await MediaAsset.find({
-    status: { $in: ["receiving", "queued"] },
-    createdAt: { $lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-  }).select("+stagedPath +sha256");
-  for (const asset of orphanedUploads) {
-    await deleteStagedAsset(asset);
-    asset.status = "failed";
-    asset.sha256 = undefined;
-    asset.stagedPath = undefined;
-    asset.failureReason = "Upload queue was not available before the staging lease expired";
-    await asset.save();
+  const uploadCutoff = new Date(now.getTime() - mediaConfig.uploadMaxAgeMs);
+  const expiredUploads = await MediaAsset.find({
+    status: {
+      $in: ["receiving", "queued", "checking", "processing", "failed"],
+    },
+    createdAt: { $lte: uploadCutoff },
+  }).select("+stagedPath +chunkDirectory +pendingCloudinaryPublicId");
+  for (const asset of expiredUploads) {
+    try {
+      await deleteStagedAsset(asset);
+      const publicId =
+        asset.pendingCloudinaryPublicId ||
+        asset.publicId ||
+        `neoplay/media/${asset.ownerId}/${asset._id}`;
+      if (
+        asset.pendingCloudinaryPublicId ||
+        asset.publicId ||
+        asset.status === "processing"
+      ) {
+        await deleteCloudinaryAsset(publicId, asset.mediaType);
+      }
+      await MediaDuplicateEvent.updateMany(
+        {
+          $or: [
+            { uploadAssetId: asset._id },
+            { matchAssetId: asset._id },
+          ],
+        },
+        { $unset: { uploadAssetId: 1, matchAssetId: 1 } },
+      );
+      await MediaAsset.deleteOne({
+        _id: asset._id,
+        status: asset.status,
+        createdAt: { $lte: uploadCutoff },
+      });
+    } catch (error) {
+      console.error("Could not permanently delete expired media upload", {
+        assetId: asset.id,
+        error,
+      });
+    }
   }
 
-  // Deterministic storage IDs let permanent failures remove objects left by interrupted DB writes.
-  const failedWithCloudId = await MediaAsset.find({
-    status: "failed",
-    pendingCloudinaryPublicId: { $exists: true, $ne: null },
-  }).select("+pendingCloudinaryPublicId");
-  for (const asset of failedWithCloudId) {
-    await deleteCloudinaryAsset(asset.pendingCloudinaryPublicId, asset.mediaType);
-    asset.pendingCloudinaryPublicId = null;
-    await asset.save();
+  const stagedAssets = await MediaAsset.find({
+    stagedPath: { $exists: true, $ne: null },
+  })
+    .select("+stagedPath +chunkDirectory")
+    .lean();
+  const removedFiles = await removeOrphanedTempFiles(
+    mediaConfig.tempDir,
+    stagedAssets.flatMap((asset) =>
+      [asset.stagedPath, asset.chunkDirectory].filter(Boolean),
+    ),
+    Date.now() - Math.max(60 * 60 * 1000, mediaConfig.maxProcessingSeconds * 2000),
+  );
+  if (removedFiles) {
+    console.log("Removed orphaned temporary media entries", { count: removedFiles });
   }
 }
 

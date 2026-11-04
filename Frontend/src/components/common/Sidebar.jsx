@@ -5,7 +5,7 @@ import { logoutFromApi } from "../../api/authApi";
 import { 
   FiHome, FiTrendingUp, FiTv, FiPlayCircle, 
   FiImage, FiTwitter, FiList,
-  FiClock, FiSettings, FiHelpCircle, 
+  FiClock, FiSettings, FiHelpCircle, FiActivity,
   FiFlag, FiLogOut
 } from "react-icons/fi";
 
@@ -50,7 +50,7 @@ function SidebarLink({ item, expanded, isActive, badge,badgeColor, dot, onClose 
               {badge}
             </span>
           )}
-          {dot && <span className="h-1.5 w-1.5 rounded-full bg-[#ff0000] shadow-[0_0_8px_rgba(124,58,237,0.35)]" />}
+          {dot && <span className="h-1.5 w-1.5 rounded-full bg-[#00ffc8] shadow-[0_0_8px_rgba(124,58,237,0.35)] animate-pulse" />}
           {item.rightIcon && <span className="text-white/40 text-xl">{item.rightIcon}</span>}
         </div>
       )}
@@ -124,14 +124,13 @@ export function Sidebar({ mobileOpen, expanded, onClose, onMouseEnter, onMouseLe
         <hr className="border-slate-500/40 my-1.5 mx-1" />
         {/* <SidebarLink item={{ label: "Community Zone", icon: <FiUsers />, to: "/community" }} expanded={expanded} isActive={checkActive("/community")} badge="Upcoming..." badgeColor="red-500"  disabled={true} /> */}
         {isAuthenticated && <SidebarLink item={{ label: user.role === "creator" ? "Creator Dashboard" : "Become a Creator", icon: <FiTv />, to: "/creator-dashboard" }} expanded={expanded} isActive={checkActive("/creator-dashboard")} badge={user.role === "creator" ? "Studio" : undefined} badgeColor="teal-500" onClose={onClose} />}
-        {isAdmin && <SidebarLink item={{ label: "Duplicate Reviews", icon: <FiFlag />, to: "/admin/media-reviews" }} expanded={expanded} isActive={checkActive("/admin/media-reviews")} badge="Admin" badgeColor="amber-500" />}
+        {isAdmin && <SidebarLink item={{ label: "Admin Dashboard", icon: <FiActivity />, to: "/admin" }} expanded={expanded} isActive={checkActive("/admin")} badge="Admin" badgeColor="amber-500" onClose={onClose} />}
       </nav>
 
       {/* BOTTOM BASE UTILITIES SECTION */}
       <div className="flex flex-col gap-0.5 p-2 border-t border-[#111827]/60 bg-[#0B1220]/40 backdrop-blur-md">
         <SidebarLink item={{ label: "Settings", icon: <FiSettings />, to: "/settings" }} expanded={expanded} isActive={checkActive("/settings")} />
         <SidebarLink item={{ label: "Help & Support", icon: <FiHelpCircle />, to: "/help-support" }} expanded={expanded} isActive={checkActive("/help-support")} />
-        <SidebarLink item={{ label: "Report", icon: <FiFlag />, to: "/report" }} expanded={expanded} isActive={checkActive("/report")} />
 
         {isAuthenticated && <SidebarLink item={{ label: "Logout", icon: <FiLogOut className="text-red-400/80 group-hover:text-red-400" />, to: undefined, onClick: handleLogout }} expanded={expanded} isActive={false} />}
       </div>

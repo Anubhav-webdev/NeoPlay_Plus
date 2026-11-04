@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Video, Image as ImageIcon, Globe, Lock, Edit2, Trash2, Save, Ban, UploadCloud, Send } from 'lucide-react';
+import { Search, Video, Image as ImageIcon, Globe, Lock, Edit2, Archive, Save, Ban, UploadCloud, Send } from 'lucide-react';
 import { FiTwitter } from 'react-icons/fi';
 import useFilePreviewUrl from "./useFilePreviewUrl.js";
 import {
@@ -75,6 +75,8 @@ export default function CreatorContentCatalog({
                           <span className={`uppercase font-bold tracking-wider text-[9px] px-1.5 py-0.5 rounded ${accent.bg} ${accent.text}`}>{asset.category}</span><span>{asset.views.toLocaleString()} Impr.</span>
                           {asset.status === 'draft' ? (
                             <span className="text-amber-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" /> Draft</span>
+                          ) : asset.status === 'archived' ? (
+                            <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Archive className="w-2.5 h-2.5" /> Archived</span>
                           ) : (
                             <span className="text-green-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" /> Public</span>
                           )}
@@ -84,11 +86,13 @@ export default function CreatorContentCatalog({
 
                     {!isEditing && (
                       <div className="flex items-center gap-1.5 self-end sm:self-center">
-                        {asset.status === 'draft' && (
-                          <button onClick={() => handlePublishDraft(asset.id)} disabled={publishingContentId === asset.id} aria-label="Publish draft" title="Publish draft" className="p-2 bg-slate-950 hover:bg-green-950/40 border border-slate-800/80 hover:border-green-500/50 text-slate-400 hover:text-green-300 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
+                        {(asset.status === 'draft' || asset.status === 'archived') && (
+                          <button onClick={() => handlePublishDraft(asset.id)} disabled={publishingContentId === asset.id} aria-label={asset.status === 'archived' ? 'Restore archived content' : 'Publish draft'} title={asset.status === 'archived' ? 'Restore content' : 'Publish draft'} className="p-2 bg-slate-950 hover:bg-green-950/40 border border-slate-800/80 hover:border-green-500/50 text-slate-400 hover:text-green-300 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
                         )}
                         <button onClick={() => startEditingAsset(asset)} className="p-2 bg-slate-950 hover:bg-purple-950/40 border border-slate-800/80 hover:border-purple-500/50 text-slate-400 hover:text-purple-300 transition-all rounded-xl active:scale-95 shadow-md"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDeleteAsset(asset.id)} disabled={deletingContentId === asset.id} aria-label="Archive content" className="p-2 bg-slate-950 hover:bg-red-950/40 border border-slate-800/80 hover:border-red-500/50 text-slate-500 hover:text-red-400 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /></button>
+                        {asset.status !== 'archived' && (
+                          <button onClick={() => handleDeleteAsset(asset.id)} disabled={deletingContentId === asset.id} aria-label="Archive content" title="Archive content" className="p-2 bg-slate-950 hover:bg-amber-950/40 border border-slate-800/80 hover:border-amber-500/50 text-slate-500 hover:text-amber-300 transition-all rounded-xl active:scale-95 shadow-md disabled:opacity-50"><Archive className="w-3.5 h-3.5" /></button>
+                        )}
                       </div>
                     )}
                   </div>

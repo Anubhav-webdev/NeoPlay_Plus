@@ -2,6 +2,8 @@ import User from "../models/users.js";
 import Creator from "../models/Creator.js";
 import Content from "../models/Content.js";
 import Report from "../models/Report.js";
+import MediaAsset from "../models/MediaAsset.js";
+import Subscription from "../models/Subscription.js";
 import { setCreatorDecision } from "./creatorController.js";
 import ApiError from "../utils/ApiError.js"
 import asyncHandler from "../utils/asyncHandler.js";
@@ -10,20 +12,114 @@ import validateObjectId from "../utils/validateObjectId.js";
 
 // Dashboard totals support the admin overview page.
 export const getOverview = asyncHandler(async (req, res) => {
-  const [users, creatorsPending, content, publishedContent, reportsPending] =
-    await Promise.all([
-      User.countDocuments(),
-      Creator.countDocuments({ applicationStatus: "pending" }),
-      Content.countDocuments(),
-      Content.countDocuments({ status: "published" }),
-      Report.countDocuments({ status: { $in: ["pending", "reviewing"] } }),
-    ]);
+  const [
+    users,
+    creatorTotal,
+    creators,
+    contentByType,
+    contentTotal,
+    publishedContent,
+    reportsByStatus,
+    mediaByType,
+    topCreators,
+  ] = await Promise.all([
+    User.countDocuments(),
+    Creator.countDocuments(),
+    Creator.aggregate([
+      { $group: { _id: "$applicationStatus", count: { $sum: 1 } } },
+    ]),
+    Content.aggregate([
+      {
+        $group: {
+          _id: "$type",
+          total: { $sum: 1 },
+          published: {
+            $sum: { $cond: [{ $eq: ["$status", "published"] }, 1, 0] },
+          },
+        },
+      },
+    ]),
+    Content.countDocuments(),
+    Content.countDocuments({ status: "published" }),
+    Report.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    MediaAsset.aggregate([
+      { $match: { status: "ready" } },
+      { $group: { _id: "$mediaType", count: { $sum: 1 } } },
+    ]),
+    Subscription.aggregate([
+      { $group: { _id: "$creatorId", subscribers: { $sum: 1 } } },
+      { $sort: { subscribers: -1 } },
+      { $limit: 8 },
+      {
+        $lookup: {
+          from: "creators",
+          localField: "_id",
+          foreignField: "_id",
+          as: "creator",
+        },
+      },
+      { $unwind: "$creator" },
+      {
+        $project: {
+          _id: "$creator._id",
+          displayName: "$creator.displayName",
+          creatorId: "$creator.creatorId",
+          applicationStatus: "$creator.applicationStatus",
+          subscribers: 1,
+        },
+      },
+    ]),
+  ]);
+
+  const creatorCounts = Object.fromEntries(
+    creators.map(({ _id, count }) => [_id, count]),
+  );
+  const contentCounts = Object.fromEntries(
+    contentByType.map(({ _id, total, published }) => [
+      _id,
+      { total, published },
+    ]),
+  );
+  const reportCounts = Object.fromEntries(
+    reportsByStatus.map(({ _id, count }) => [_id, count]),
+  );
+  const mediaCounts = Object.fromEntries(
+    mediaByType.map(({ _id, count }) => [_id, count]),
+  );
+
   return sendResponse(res, 200, "Admin overview", {
     users,
-    creatorsPending,
-    content,
+    creators: {
+      total: creatorTotal,
+      approved: creatorCounts.approved || 0,
+      pending: creatorCounts.pending || 0,
+      rejected: creatorCounts.rejected || 0,
+      suspended: creatorCounts.suspended || 0,
+    },
+    creatorsPending: creatorCounts.pending || 0,
+    content: {
+      total: contentTotal,
+      published: publishedContent,
+      videos: contentCounts.Video?.total || 0,
+      images: contentCounts.Image?.total || 0,
+      tweets: contentCounts.Tweet?.total || 0,
+      byType: contentCounts,
+      readyVideoAssets: mediaCounts.video || 0,
+      readyImageAssets: mediaCounts.image || 0,
+    },
     publishedContent,
-    reportsPending,
+    reports: {
+      total: Object.values(reportCounts).reduce((sum, count) => sum + count, 0),
+      pending: reportCounts.pending || 0,
+      reviewing: reportCounts.reviewing || 0,
+      resolved: reportCounts.resolved || 0,
+      dismissed: reportCounts.dismissed || 0,
+    },
+    reportsPending:
+      (reportCounts.pending || 0) + (reportCounts.reviewing || 0),
+    topCreators,
   });
 });
 
@@ -49,7 +145,7 @@ export const listUsers = asyncHandler(async (req, res) => {
   }
   const [users, total] = await Promise.all([
     User.find(filter)
-      .select("_id name username email phoneNumber role isVerified createdAt")
+      .select("_id name username email phoneNumber avatar role isVerified createdAt")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
@@ -113,6 +209,9 @@ export const listContent = asyncHandler(async (req, res) => {
     ["draft", "published", "archived"].includes(req.query.status)
   ) {
     filter.status = req.query.status;
+  }
+  if (["Tweet", "Video", "Image"].includes(req.query.type)) {
+    filter.type = req.query.type;
   }
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const limit = Math.min(

@@ -8,7 +8,7 @@ const metrics = [
   { key: "contentCount", label: "All content", icon: UserPlus, color: "text-green-400" },
 ];
 
-export default function CreatorAnalytics({ analytics, onManageSubscriptions, isLoadingSubscriptions = false }) {
+export default function CreatorAnalytics({ analytics }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -27,16 +27,6 @@ export default function CreatorAnalytics({ analytics, onManageSubscriptions, isL
             </div>
           </motion.div>
         ))}
-      </div>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onManageSubscriptions}
-          disabled={isLoadingSubscriptions}
-          className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:border-cyan-500/50 hover:text-cyan-300 disabled:cursor-wait disabled:opacity-60"
-        >
-          {isLoadingSubscriptions ? 'Loading subscriptions...' : 'Manage subscriptions'}
-        </button>
       </div>
     </div>
   );

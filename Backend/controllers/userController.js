@@ -105,9 +105,26 @@ export const uploadUserAvatar = asyncHandler(async (req, res) => {
     delete result.avatarPublicId;
     return sendResponse(res, 200, "Profile image updated", { user: result });
   } finally {
-    if (filePath) await fs.rm(filePath, { force: true }).catch(() => {});
+    if (filePath) {
+      try {
+        await fs.rm(filePath, { force: true });
+      } catch (cleanupError) {
+        console.error("Could not remove temporary user profile upload", {
+          userId: req.user.id,
+          cleanupError,
+        });
+      }
+    }
     if (uploadedAsset && !profileSaved) {
-      await deleteCloudinaryAsset(uploadedAsset.public_id, "image").catch(() => {});
+      try {
+        await deleteCloudinaryAsset(uploadedAsset.public_id, "image");
+      } catch (cleanupError) {
+        console.error("Could not remove uncommitted user profile image", {
+          userId: req.user.id,
+          publicId: uploadedAsset.public_id,
+          cleanupError,
+        });
+      }
     }
   }
 });

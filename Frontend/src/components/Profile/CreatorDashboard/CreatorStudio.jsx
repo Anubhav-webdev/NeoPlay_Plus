@@ -6,12 +6,10 @@ import CreatorAnalytics from './CreatorAnalytics.jsx';
 import UploadContentForm from './UploadContentForm.jsx';
 import CreatorContentCatalog from './CreatorContentCatalog.jsx';
 import CreatorComments from './CreatorComments.jsx';
-import SubscriptionsModal from './SubscriptionsModal.jsx';
 import useCreatorCatalogActions from './hooks/useCreatorCatalogActions.js';
 import useCreatorProfile from './hooks/useCreatorProfile.js';
 import useCreatorPublisher from './hooks/useCreatorPublisher.js';
 import useCreatorStudioData from './hooks/useCreatorStudioData.js';
-import useCreatorSubscriptions from './hooks/useCreatorSubscriptions.js';
 
 const TYPE_ACCENT = {
   video: { text: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' },
@@ -53,7 +51,6 @@ export default function CreatorStudio({ creator, user }) {
     setContentCatalog: data.setContentCatalog,
     showToast,
   });
-  const subscriptions = useCreatorSubscriptions(showToast);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredCatalog = useMemo(() => data.contentCatalog.filter((item) => (
@@ -104,8 +101,6 @@ export default function CreatorStudio({ creator, user }) {
 
         <CreatorAnalytics
           analytics={data.analytics}
-          onManageSubscriptions={subscriptions.openSubscriptions}
-          isLoadingSubscriptions={subscriptions.isLoading}
         />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -131,6 +126,13 @@ export default function CreatorStudio({ creator, user }) {
               handlePublishAsset={publisher.handlePublishAsset}
               isPublishing={publisher.isPublishing}
               uploadStatus={publisher.uploadStatus}
+              uploadPercent={publisher.uploadPercent}
+              uploadChunkProgress={publisher.uploadChunkProgress}
+              maxUploadBytes={publisher.uploadLimits?.maxBytes}
+              maxVideoDurationSeconds={publisher.uploadLimits?.maxVideoDurationSeconds}
+              largeVideoCompressionThresholdBytes={
+                publisher.uploadLimits?.largeVideoCompressionThresholdBytes
+              }
             />
           </div>
 
@@ -171,15 +173,6 @@ export default function CreatorStudio({ creator, user }) {
           submitReplyToComment={data.submitReplyToComment}
         />
       </main>
-
-      <SubscriptionsModal
-        isOpen={subscriptions.isOpen}
-        setIsOpen={subscriptions.setIsOpen}
-        subscriptions={subscriptions.subscriptions}
-        isLoading={subscriptions.isLoading}
-        unsubscribingCreatorId={subscriptions.unsubscribingCreatorId}
-        onUnsubscribe={subscriptions.unsubscribe}
-      />
     </div>
   );
 }

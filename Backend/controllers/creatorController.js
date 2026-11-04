@@ -255,9 +255,26 @@ export const uploadCreatorProfileImage = asyncHandler(async (req, res) => {
     delete result.bannerPublicId;
     return sendResponse(res, 200, "Creator profile image updated", { creator: result });
   } finally {
-    if (filePath) await fs.rm(filePath, { force: true }).catch(() => {});
+    if (filePath) {
+      try {
+        await fs.rm(filePath, { force: true });
+      } catch (cleanupError) {
+        console.error("Could not remove temporary creator profile upload", {
+          creatorId: req.creator?.id,
+          cleanupError,
+        });
+      }
+    }
     if (uploadedAsset && !profileSaved) {
-      await deleteCloudinaryAsset(uploadedAsset.public_id, "image").catch(() => {});
+      try {
+        await deleteCloudinaryAsset(uploadedAsset.public_id, "image");
+      } catch (cleanupError) {
+        console.error("Could not remove uncommitted creator profile image", {
+          creatorId: req.creator?.id,
+          publicId: uploadedAsset.public_id,
+          cleanupError,
+        });
+      }
     }
   }
 });

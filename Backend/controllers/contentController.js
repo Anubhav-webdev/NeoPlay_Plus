@@ -3,11 +3,19 @@ import Creator from "../models/Creator.js";
 import Category from "../models/Category.js";
 import MediaAsset from "../models/MediaAsset.js";
 import Comment from "../models/Comment.js";
+import Like from "../models/Like.js";
+import Playlist from "../models/Playlist.js";
+import ReplyComment from "../models/ReplyComment.js";
+import Report from "../models/Report.js";
+import WatchHistory from "../models/WatchHistory.js";
+import Wishlist from "../models/Wishlist.js";
+import MediaDuplicateEvent from "../models/MediaDuplicateEvent.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
 import cloudinary from "../config/cloudinary.js";
+import { deleteCloudinaryAsset } from "../services/cloudinaryService.js";
 
 function toContentObject(content) {
   const value = content.toObject ? content.toObject() : content;
@@ -129,14 +137,14 @@ export const listMyContent = asyncHandler(async (req, res) => {
     return sendResponse(res, 200, "Creator content retrieved", { items: [] });
   const { page, limit, skip } = pagination(req.query);
   const [items, total] = await Promise.all([
-    Content.find({ creatorId: creator._id, status: { $ne: "archived" } })
+    Content.find({ creatorId: creator._id })
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate("categoryIds", "name slug")
       .populate("mediaAssetId", "mediaType")
       .populate("thumbnailAssetId", "secureUrl"),
-    Content.countDocuments({ creatorId: creator._id, status: { $ne: "archived" } }),
+    Content.countDocuments({ creatorId: creator._id }),
   ]);
   return sendResponse(res, 200, "Creator content retrieved", {
     items: items.map(toContentObject),
@@ -367,6 +375,156 @@ export const archiveContent = asyncHandler(async (req, res) => {
   content.status = "archived";
   await content.save();
   return sendResponse(res, 200, "Content archived", { content });
+});
+
+export const permanentlyDeleteContent = asyncHandler(async (req, res) => {
+  if (req.user.role !== "admin") {
+    throw new ApiError(403, "Only administrators can permanently delete content");
+  }
+  validateObjectId(req.params.contentId, "contentId");
+  const content = await Content.findById(req.params.contentId);
+  if (!content) throw new ApiError(404, "Content not found");
+
+  const assetIds = [
+    ...new Set(
+      [content.mediaAssetId, content.thumbnailAssetId]
+        .filter(Boolean)
+        .map(String),
+    ),
+  ];
+  const assetQuery = [
+    ...(assetIds.length ? [{ _id: { $in: assetIds } }] : []),
+    ...(content.mediaPublicId ? [{ publicId: content.mediaPublicId }] : []),
+    ...(content.thumbnailUrl ? [{ secureUrl: content.thumbnailUrl }] : []),
+  ];
+  const assets = assetQuery.length
+    ? await MediaAsset.find({ $or: assetQuery })
+        .select("+stagedPath +pendingCloudinaryPublicId")
+        .lean()
+    : [];
+  const deletableAssets = [];
+  for (const asset of assets) {
+    const sharedAssetReferences = [
+      { mediaAssetId: asset._id },
+      { thumbnailAssetId: asset._id },
+      ...(asset.publicId ? [{ mediaPublicId: asset.publicId }] : []),
+      ...(asset.secureUrl ? [{ mediaUrl: asset.secureUrl }] : []),
+      ...(asset.secureUrl ? [{ thumbnailUrl: asset.secureUrl }] : []),
+    ];
+    const isUsedElsewhere = await Content.exists({
+      _id: { $ne: content._id },
+      $or: sharedAssetReferences,
+    });
+    if (!isUsedElsewhere) deletableAssets.push(asset);
+  }
+
+  const deletionTargets = new Map();
+  for (const asset of deletableAssets) {
+    const publicId =
+      asset.publicId ||
+      asset.pendingCloudinaryPublicId ||
+      `neoplay/media/${asset.ownerId}/${asset._id}`;
+    const resourceType = asset.resourceType || asset.mediaType;
+    deletionTargets.set(`${resourceType}:${publicId}`, {
+      publicId,
+      resourceType,
+    });
+  }
+  if (
+    content.mediaPublicId &&
+    !assets.some(
+      (asset) =>
+        asset.publicId === content.mediaPublicId ||
+        String(asset._id) === String(content.mediaAssetId),
+    )
+  ) {
+    const usedElsewhere = await Content.exists({
+      _id: { $ne: content._id },
+      mediaPublicId: content.mediaPublicId,
+    });
+    if (!usedElsewhere) {
+      const linkedAsset = assets.find(
+        (asset) => String(asset._id) === String(content.mediaAssetId),
+      );
+      const urlResourceType = content.mediaUrl?.match(
+        /\/(image|video)\/upload\//,
+      )?.[1];
+      const resourceType =
+        linkedAsset?.resourceType ||
+        linkedAsset?.mediaType ||
+        (content.type === "Video" ? "video" : null) ||
+        (content.type === "Image" ? "image" : null) ||
+        urlResourceType;
+      if (!resourceType) {
+        throw new ApiError(
+          409,
+          "Unable to determine the media type; content and media were not deleted.",
+        );
+      }
+      deletionTargets.set(`${resourceType}:${content.mediaPublicId}`, {
+        publicId: content.mediaPublicId,
+        resourceType,
+      });
+    }
+  }
+
+  try {
+    for (const target of deletionTargets.values()) {
+      await deleteCloudinaryAsset(target.publicId, target.resourceType);
+    }
+  } catch (error) {
+    console.error("Could not remove media during permanent content deletion", {
+      contentId: content.id,
+      error,
+    });
+    throw new ApiError(
+      503,
+      "Media could not be permanently deleted; the content was not removed. Please retry.",
+    );
+  }
+
+  const deletableAssetIds = deletableAssets.map((asset) => asset._id);
+  const cleanupOperations = [
+    (async () => {
+      const commentIds = await Comment.distinct("_id", {
+        contentId: content._id,
+      });
+      await Promise.all([
+        ReplyComment.deleteMany({ commentId: { $in: commentIds } }),
+        Comment.deleteMany({ _id: { $in: commentIds } }),
+      ]);
+    })(),
+    Like.deleteMany({ contentId: content._id }),
+    WatchHistory.deleteMany({ contentId: content._id }),
+    Wishlist.deleteMany({ contentId: content._id }),
+    Report.deleteMany({ contentId: content._id }),
+    Playlist.updateMany(
+      { contentIds: content._id },
+      { $pull: { contentIds: content._id } },
+    ),
+  ];
+  if (deletableAssetIds.length) {
+    cleanupOperations.push(
+      MediaDuplicateEvent.updateMany(
+        {
+          $or: [
+            { uploadAssetId: { $in: deletableAssetIds } },
+            { matchAssetId: { $in: deletableAssetIds } },
+          ],
+        },
+        { $unset: { uploadAssetId: 1, matchAssetId: 1 } },
+      ),
+      MediaAsset.deleteMany({ _id: { $in: deletableAssetIds } }),
+    );
+  }
+  await Promise.all(cleanupOperations);
+
+  const result = await Content.deleteOne({ _id: content._id });
+  if (!result.deletedCount) throw new ApiError(404, "Content not found");
+  return sendResponse(res, 200, "Content and unshared media permanently deleted", {
+    contentId: content.id,
+    deletedMediaAssets: deletableAssetIds.length,
+  });
 });
 
 export const incrementView = asyncHandler(async (req, res) => {

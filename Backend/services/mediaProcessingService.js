@@ -116,12 +116,17 @@ async function convertImage(sourcePath, assetId) {
 
 async function transcodeVideo(sourcePath, assetId) {
   await fs.mkdir(mediaConfig.tempDir, { recursive: true });
+  const sourceStats = await fs.stat(sourcePath);
+  const crf = sourceStats.size > mediaConfig.largeVideoCompressionThresholdBytes
+    ? mediaConfig.largeVideoCrf
+    : mediaConfig.videoCrf;
   const targetPath = path.join(
     mediaConfig.tempDir,
     `${assetId}-${randomUUID()}.mp4`
   );
   const { spawn } = await import("node:child_process");
   await new Promise((resolve, reject) => {
+    let timedOut = false;
     const child = spawn(
       mediaConfig.ffmpegPath,
       [
@@ -142,7 +147,7 @@ async function transcodeVideo(sourcePath, assetId) {
         "-preset",
         process.env.MEDIA_VIDEO_PRESET || "veryfast",
         "-crf",
-        process.env.MEDIA_VIDEO_CRF || "28",
+        String(crf),
         "-threads",
         "2",
         "-c:a",
@@ -158,7 +163,10 @@ async function transcodeVideo(sourcePath, assetId) {
     );
     let stderr = "";
     const timer = setTimeout(
-      () => child.kill("SIGKILL"),
+      () => {
+        timedOut = true;
+        child.kill("SIGKILL");
+      },
       mediaConfig.maxProcessingSeconds * 1000
     );
     child.stderr.on("data", (chunk) => {
@@ -170,6 +178,14 @@ async function transcodeVideo(sourcePath, assetId) {
     });
     child.once("close", (code) => {
       clearTimeout(timer);
+      if (timedOut) {
+        reject(
+          new Error(
+            `FFmpeg video transcoding exceeded the ${mediaConfig.maxProcessingSeconds}-second processing limit`,
+          ),
+        );
+        return;
+      }
       if (code !== 0) {
         reject(
           new Error(`FFmpeg video processing failed: ${stderr.slice(0, 1000)}`)
@@ -376,17 +392,24 @@ export async function processMediaAsset(
 
 export async function failMediaAsset(assetId, error) {
   const asset = await MediaAsset.findById(assetId).select(
-    "+sha256 +stagedPath +pendingCloudinaryPublicId"
+    "+sha256 +stagedPath +chunkDirectory +pendingCloudinaryPublicId"
   );
   if (!asset) return;
 
   const cloudinaryPublicId =
     asset.pendingCloudinaryPublicId ||
     `neoplay/media/${asset.ownerId}/${asset._id}`;
-  if (cloudinaryPublicId) {
+  const cloudinaryConfigured = Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+  let cloudinaryCleanupFailed = false;
+  if (cloudinaryPublicId && cloudinaryConfigured) {
     try {
       await deleteCloudinaryAsset(cloudinaryPublicId, asset.mediaType);
     } catch (cleanupError) {
+      cloudinaryCleanupFailed = true;
       console.error("Cloudinary orphan cleanup failed", {
         assetId,
         publicId: cloudinaryPublicId,
@@ -395,19 +418,27 @@ export async function failMediaAsset(assetId, error) {
     }
   }
   if (asset.stagedPath) await fs.rm(asset.stagedPath, { force: true });
+  if (asset.chunkDirectory) {
+    await fs.rm(asset.chunkDirectory, { recursive: true, force: true });
+  }
   asset.status = "failed";
   asset.failureReason = String(
     error?.message || "Media processing failed"
   ).slice(0, 1000);
   asset.sha256 = undefined;
   asset.stagedPath = undefined;
-  asset.pendingCloudinaryPublicId = null;
+  asset.pendingCloudinaryPublicId = cloudinaryCleanupFailed
+    ? cloudinaryPublicId
+    : null;
   asset.expiresAt = null;
   await asset.save();
 }
 
 export async function deleteStagedAsset(asset) {
   if (asset.stagedPath) await fs.rm(asset.stagedPath, { force: true });
+  if (asset.chunkDirectory) {
+    await fs.rm(asset.chunkDirectory, { recursive: true, force: true });
+  }
 }
 
 export function safeOriginalName(name) {

@@ -1,6 +1,7 @@
 import cloudinary from "../config/cloudinary.js";
 import ApiError from "../utils/ApiError.js";
 import path from "node:path";
+import { mediaConfig } from "../config/media.js";
 
 function assertConfigured() {
   const required = [
@@ -73,7 +74,7 @@ export async function uploadFile(filePath, { folder, publicId, resourceType }) {
       overwrite: false,
       unique_filename: false,
       use_filename: false,
-      timeout: 120_000,
+      timeout: mediaConfig.cloudinaryUploadTimeoutMs,
       tags: ["neoplay-media-asset"],
     });
   } catch (error) {

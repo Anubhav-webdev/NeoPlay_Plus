@@ -233,6 +233,7 @@ async function extractVideoFrames(filePath, outputDir, duration) {
   const outputPattern = path.join(outputDir, "frame-%03d.jpg");
   const fps = `${count}/${duration}`;
   await new Promise((resolve, reject) => {
+    let timedOut = false;
     const child = spawn(
       mediaConfig.ffmpegPath,
       [
@@ -254,7 +255,10 @@ async function extractVideoFrames(filePath, outputDir, duration) {
     );
     let stderr = "";
     const timer = setTimeout(
-      () => child.kill("SIGKILL"),
+      () => {
+        timedOut = true;
+        child.kill("SIGKILL");
+      },
       mediaConfig.maxProcessingSeconds * 1000
     );
     child.stderr.on("data", (chunk) => {
@@ -266,6 +270,14 @@ async function extractVideoFrames(filePath, outputDir, duration) {
     });
     child.once("close", (code) => {
       clearTimeout(timer);
+      if (timedOut) {
+        reject(
+          new Error(
+            `FFmpeg video frame extraction exceeded the ${mediaConfig.maxProcessingSeconds}-second processing limit`,
+          ),
+        );
+        return;
+      }
       if (code !== 0)
         reject(
           new Error(`FFmpeg frame extraction failed: ${stderr.slice(0, 1000)}`)

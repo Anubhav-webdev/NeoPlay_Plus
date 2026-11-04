@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { Layers, Radio } from "lucide-react";
 import ProfileHeroHub from "./ProfileHeroHub";
 import MediaCatalogStream from "./MediaCatalogStream";
 import { getPublishedContent, getPublishedCreatorById } from "../../../api/contentApi";
@@ -149,26 +148,11 @@ export default function CreatorProfile() {
           onToggleSubscription={toggleSubscription}
           subscriptionBusy={updatingSubscription}
           subscriberCount={subscriberCount}
+          publishedContentCount={catalog.length}
         />
         {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
         <div className="grid grid-cols-1 gap-6 items-start">
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                ...(subscriberCount === null ? [] : [
-                  { label: "Subscribers", value: subscriberCount, icon: Radio, color: "text-purple-400", bg: "bg-purple-500/10" },
-                ]),
-                { label: "Published content", value: catalog.length, icon: Layers, color: "text-cyan-400", bg: "bg-cyan-500/10" },
-              ].map((metric) => (
-                <div key={metric.label} className="flex min-h-[90px] items-center gap-4 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-4">
-                  <div className={`rounded-xl p-3 ${metric.bg}`}><metric.icon className={`h-5 w-5 ${metric.color}`} /></div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400">{metric.label}</p>
-                    <h3 className="mt-0.5 text-lg font-bold text-white">{metric.value}</h3>
-                  </div>
-                </div>
-              ))}
-            </div>
             <MediaCatalogStream
               profileTab={profileTab}
               setProfileTab={setProfileTab}
