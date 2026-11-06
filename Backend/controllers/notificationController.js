@@ -32,7 +32,7 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
   const notification = await Notification.findOneAndUpdate(
     { _id: req.params.notificationId, userId: req.user._id },
     { isRead: true },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!notification) throw new ApiError(404, "Notification not found");
   return sendResponse(res, 200, "Notification marked as read", {

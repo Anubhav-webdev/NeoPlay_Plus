@@ -7,6 +7,7 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import { withContentMutationLock } from "../services/contentDeletionService.js";
 
 export const listComments = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
@@ -81,52 +82,61 @@ export const listMyCreatorComments = asyncHandler(async (req, res) => {
 
 export const createComment = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findOne({
-    _id: req.params.contentId,
-    status: "published",
-  });
-  if (!content) throw new ApiError(404, "Content not found");
-  const text = String(req.body.text || "").trim();
-  if (!text || text.length > 2000)
-    throw new ApiError(400, "Comment must be 1-2000 characters");
-  const comment = await Comment.create({
-    contentId: content._id,
-    userId: req.user._id,
-    text,
-  });
-  const creator = await Creator.findById(content.creatorId);
-  if (creator && String(creator.userId) !== String(req.user._id)) {
-    await Notification.create({
-      userId: creator.userId,
-      type: "comment",
-      message: "Someone commented on your content",
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findOne({
+      _id: req.params.contentId,
+      status: "published",
     });
-  }
-  await comment.populate("userId", "name username avatar");
-  return sendResponse(res, 201, "Comment created", { comment });
+    if (!content) throw new ApiError(404, "Content not found");
+    const text = String(req.body.text || "").trim();
+    if (!text || text.length > 2000)
+      throw new ApiError(400, "Comment must be 1-2000 characters");
+    const comment = await Comment.create({
+      contentId: content._id,
+      userId: req.user._id,
+      text,
+    });
+    const creator = await Creator.findById(content.creatorId);
+    if (creator && String(creator.userId) !== String(req.user._id)) {
+      await Notification.create({
+        userId: creator.userId,
+        type: "comment",
+        message: "Someone commented on your content",
+      });
+    }
+    await comment.populate("userId", "name username avatar");
+    return sendResponse(res, 201, "Comment created", { comment });
+  });
 });
 
 export const createReply = asyncHandler(async (req, res) => {
   validateObjectId(req.params.commentId, "commentId");
-  const comment = await Comment.findById(req.params.commentId);
-  if (!comment) throw new ApiError(404, "Comment not found");
-  const text = String(req.body.text || "").trim();
-  if (!text || text.length > 2000)
-    throw new ApiError(400, "Reply must be 1-2000 characters");
-  const reply = await ReplyComment.create({
-    commentId: comment._id,
-    userId: req.user._id,
-    text,
-  });
-  if (String(comment.userId) !== String(req.user._id)) {
-    await Notification.create({
-      userId: comment.userId,
-      type: "reply",
-      message: "Someone replied to your comment",
+  const existingComment = await Comment.findById(req.params.commentId);
+  if (!existingComment) throw new ApiError(404, "Comment not found");
+  return withContentMutationLock(existingComment.contentId, async () => {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) throw new ApiError(404, "Comment not found");
+    if (!(await Content.exists({ _id: comment.contentId }))) {
+      throw new ApiError(404, "Content not found");
+    }
+    const text = String(req.body.text || "").trim();
+    if (!text || text.length > 2000)
+      throw new ApiError(400, "Reply must be 1-2000 characters");
+    const reply = await ReplyComment.create({
+      commentId: comment._id,
+      userId: req.user._id,
+      text,
     });
-  }
-  await reply.populate("userId", "name username avatar");
-  return sendResponse(res, 201, "Reply created", { reply });
+    if (String(comment.userId) !== String(req.user._id)) {
+      await Notification.create({
+        userId: comment.userId,
+        type: "reply",
+        message: "Someone replied to your comment",
+      });
+    }
+    await reply.populate("userId", "name username avatar");
+    return sendResponse(res, 201, "Reply created", { reply });
+  });
 });
 
 export const listReplies = asyncHandler(async (req, res) => {
@@ -139,19 +149,21 @@ export const listReplies = asyncHandler(async (req, res) => {
 
 export const deleteComment = asyncHandler(async (req, res) => {
   validateObjectId(req.params.commentId, "commentId");
-  const comment = await Comment.findById(req.params.commentId);
-  if (!comment) throw new ApiError(404, "Comment not found");
-  if (
-    req.user.role !== "admin" &&
-    String(comment.userId) !== String(req.user._id)
-  ) {
-    throw new ApiError(403, "You cannot delete this comment");
-  }
-  await Promise.all([
-    ReplyComment.deleteMany({ commentId: comment._id }),
-    comment.deleteOne(),
-  ]);
-  return sendResponse(res, 200, "Comment deleted");
+  const existingComment = await Comment.findById(req.params.commentId);
+  if (!existingComment) throw new ApiError(404, "Comment not found");
+  return withContentMutationLock(existingComment.contentId, async () => {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) throw new ApiError(404, "Comment not found");
+    if (
+      req.user.role !== "admin" &&
+      String(comment.userId) !== String(req.user._id)
+    ) {
+      throw new ApiError(403, "You cannot delete this comment");
+    }
+    await ReplyComment.deleteMany({ commentId: comment._id });
+    await comment.deleteOne();
+    return sendResponse(res, 200, "Comment deleted");
+  });
 });
 
 export const deleteReply = asyncHandler(async (req, res) => {

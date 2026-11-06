@@ -5,7 +5,9 @@ import { fileTypeFromFile } from "file-type";
 import sharp from "sharp";
 import mongoose from "mongoose";
 import Creator from "../models/Creator.js";
+import Subscription from "../models/Subscription.js";
 import User from "../models/users.js";
+import Admin from "../models/Admin.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
@@ -87,8 +89,18 @@ export const listCreators = asyncHandler(async (req, res) => {
       .limit(limit),
     Creator.countDocuments(filter),
   ]);
+  const subscriberCounts = await Subscription.aggregate([
+    { $match: { creatorId: { $in: creators.map((creator) => creator._id) } } },
+    { $group: { _id: "$creatorId", count: { $sum: 1 } } },
+  ]);
+  const countsByCreatorId = new Map(
+    subscriberCounts.map(({ _id, count }) => [String(_id), count])
+  );
   return sendResponse(res, 200, "Creators retrieved", {
-    creators,
+    creators: creators.map((creator) => ({
+      ...creator.toObject(),
+      subscriberCount: countsByCreatorId.get(String(creator._id)) || 0,
+    })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 });
@@ -302,8 +314,10 @@ export const setCreatorDecision = async (creatorId, status) => {
   creator.applicationStatus = status;
   creator.approvedAt = status === "approved" ? new Date() : null;
   await creator.save();
-  await User.findByIdAndUpdate(creator.userId, {
-    role: status === "approved" ? "creator" : "user",
-  });
+  if (!(await Admin.exists({ _id: creator.userId }))) {
+    await User.findByIdAndUpdate(creator.userId, {
+      role: status === "approved" ? "creator" : "user",
+    });
+  }
   return creator;
 };

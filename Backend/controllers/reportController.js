@@ -4,33 +4,36 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import { withContentMutationLock } from "../services/contentDeletionService.js";
 
 export const createReport = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findOne({
-    _id: req.params.contentId,
-    status: "published",
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findOne({
+      _id: req.params.contentId,
+      status: "published",
+    });
+    if (!content) throw new ApiError(404, "Published content not found");
+    const allowedReasons = [
+      "spam",
+      "harassment",
+      "hate",
+      "violence",
+      "copyright",
+      "sexual",
+      "misinformation",
+      "other",
+    ];
+    if (!allowedReasons.includes(req.body.reason)) {
+      throw new ApiError(400, "A valid report reason is required");
+    }
+    const report = await Report.create({
+      reporterId: req.user._id,
+      contentId: content._id,
+      reason: req.body.reason,
+    });
+    return sendResponse(res, 201, "Report submitted", { report });
   });
-  if (!content) throw new ApiError(404, "Published content not found");
-  const allowedReasons = [
-    "spam",
-    "harassment",
-    "hate",
-    "violence",
-    "copyright",
-    "sexual",
-    "misinformation",
-    "other",
-  ];
-  if (!allowedReasons.includes(req.body.reason)) {
-    throw new ApiError(400, "A valid report reason is required");
-  }
-  const report = await Report.create({
-    reporterId: req.user._id,
-    contentId: content._id,
-    reason: req.body.reason,
-  });
-  return sendResponse(res, 201, "Report submitted", { report });
 });
 
 export const listReports = asyncHandler(async (req, res) => {
@@ -68,7 +71,7 @@ export const updateReportStatus = asyncHandler(async (req, res) => {
   const report = await Report.findByIdAndUpdate(
     req.params.reportId,
     { status: req.body.status },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
   if (!report) throw new ApiError(404, "Report not found");
   return sendResponse(res, 200, "Report status updated", { report });

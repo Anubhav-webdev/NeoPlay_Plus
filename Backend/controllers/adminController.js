@@ -1,14 +1,23 @@
 import User from "../models/users.js";
+import Admin from "../models/Admin.js";
 import Creator from "../models/Creator.js";
 import Content from "../models/Content.js";
 import Report from "../models/Report.js";
 import MediaAsset from "../models/MediaAsset.js";
+import ContentDeletion from "../models/ContentDeletion.js";
 import Subscription from "../models/Subscription.js";
 import { setCreatorDecision } from "./creatorController.js";
 import ApiError from "../utils/ApiError.js"
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import { getPagination } from "../utils/pagination.js";
+import { withContentMutationLock } from "../services/contentDeletionService.js";
+import {
+  demoteAdminToUser,
+  promoteUserToAdmin,
+  toAdminPrincipal,
+} from "../services/adminDataService.js";
 
 // Dashboard totals support the admin overview page.
 export const getOverview = asyncHandler(async (req, res) => {
@@ -124,14 +133,15 @@ export const getOverview = asyncHandler(async (req, res) => {
 });
 
 export const listUsers = asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(
-    100,
-    Math.max(1, Number.parseInt(req.query.limit, 10) || 30)
-  );
+  const { page, limit, skip } = getPagination(req.query, {
+    defaultLimit: 30,
+    maxLimit: 100,
+  });
+  const role = ["user", "creator", "admin"].includes(req.query.role)
+    ? req.query.role
+    : null;
   const filter = {};
-  if (["user", "creator", "admin"].includes(req.query.role))
-    filter.role = req.query.role;
+  if (role === "user" || role === "creator") filter.role = role;
   if (req.query.search) {
     const escaped = String(req.query.search)
       .trim()
@@ -143,14 +153,40 @@ export const listUsers = asyncHandler(async (req, res) => {
       { username: { $regex: escaped, $options: "i" } },
     ];
   }
-  const [users, total] = await Promise.all([
-    User.find(filter)
-      .select("_id name username email phoneNumber avatar role isVerified createdAt")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit),
-    User.countDocuments(filter),
+  const adminDocs = role === "user" || role === "creator"
+    ? []
+    : await Admin.find().select(
+        "+nameEncrypted +usernameEncrypted +emailEncrypted +phoneNumberEncrypted",
+      );
+  const adminUsers = adminDocs
+    .map(toAdminPrincipal)
+    .filter((user) => {
+      if (!req.query.search) return true;
+      const search = String(req.query.search).trim().slice(0, 100).toLowerCase();
+      return [user.name, user.email, user.username]
+        .some((value) => value?.toLowerCase().includes(search));
+    });
+  const adminIds = adminDocs.map((admin) => admin._id);
+  if (adminIds.length) filter._id = { $nin: adminIds };
+  const userOffset = Math.max(0, skip - adminUsers.length);
+  const userLimit = limit + adminUsers.length;
+  const [regularUsers, regularTotal] = await Promise.all([
+    role === "admin"
+      ? []
+      : User.find(filter)
+          .select("_id name username email phoneNumber avatar role isVerified createdAt")
+          .sort({ createdAt: -1, _id: -1 })
+          .skip(userOffset)
+          .limit(userLimit),
+    role === "admin" ? 0 : User.countDocuments(filter),
   ]);
+  const users = [...regularUsers, ...adminUsers]
+    .sort((left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      || String(right._id).localeCompare(String(left._id)),
+    )
+    .slice(skip, skip + limit);
+  const total = regularTotal + adminUsers.length;
   return sendResponse(res, 200, "Users retrieved", {
     users,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
@@ -169,15 +205,22 @@ export const updateUserRole = asyncHandler(async (req, res) => {
   ) {
     throw new ApiError(400, "You cannot remove your own admin role");
   }
-  const user = await User.findByIdAndUpdate(
-    req.params.userId,
-    { role: req.body.role },
-    {
-      new: true,
-      runValidators: true,
-      select: "_id name username email role createdAt",
-    }
-  );
+  let user;
+  if (req.body.role === "admin") {
+    user = await promoteUserToAdmin(req.params.userId);
+  } else if (await Admin.exists({ _id: req.params.userId })) {
+    user = await demoteAdminToUser(req.params.userId);
+  } else {
+    user = await User.findByIdAndUpdate(
+      req.params.userId,
+      { role: req.body.role },
+      {
+        returnDocument: "after",
+        runValidators: true,
+        select: "_id name username email role createdAt",
+      },
+    );
+  }
   if (!user) throw new ApiError(404, "User not found");
   return sendResponse(res, 200, "User role updated", { user });
 });
@@ -204,6 +247,10 @@ export const decideCreatorApplication = asyncHandler(async (req, res) => {
 
 export const listContent = asyncHandler(async (req, res) => {
   const filter = {};
+  const pendingDeletions = await ContentDeletion.find({
+    status: { $ne: "completed" },
+  }).distinct("contentId");
+  filter._id = { $nin: pendingDeletions };
   if (
     req.query.status &&
     ["draft", "published", "archived"].includes(req.query.status)
@@ -213,16 +260,15 @@ export const listContent = asyncHandler(async (req, res) => {
   if (["Tweet", "Video", "Image"].includes(req.query.type)) {
     filter.type = req.query.type;
   }
-  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(
-    100,
-    Math.max(1, Number.parseInt(req.query.limit, 10) || 30)
-  );
+  const { page, limit, skip } = getPagination(req.query, {
+    defaultLimit: 30,
+    maxLimit: 100,
+  });
   const [items, total] = await Promise.all([
     Content.find(filter)
       .populate("creatorId", "displayName userId")
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
+      .skip(skip)
       .limit(limit),
     Content.countDocuments(filter),
   ]);
@@ -237,23 +283,25 @@ export const moderateContent = asyncHandler(async (req, res) => {
   if (!["published", "archived"].includes(req.body.status)) {
     throw new ApiError(400, "status must be published or archived");
   }
-  const content = await Content.findById(req.params.contentId);
-  if (!content) throw new ApiError(404, "Content not found");
-  if (
-    req.body.status === "published" &&
-    content.type !== "Tweet" &&
-    !content.mediaUrl
-  ) {
-    throw new ApiError(
-      400,
-      "Video and image posts require media before publishing"
-    );
-  }
-  content.status = req.body.status;
-  content.publishedAt =
-    req.body.status === "published"
-      ? content.publishedAt || new Date()
-      : content.publishedAt;
-  await content.save();
-  return sendResponse(res, 200, "Content moderated", { content });
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findById(req.params.contentId);
+    if (!content) throw new ApiError(404, "Content not found");
+    if (
+      req.body.status === "published" &&
+      content.type !== "Tweet" &&
+      !content.mediaUrl
+    ) {
+      throw new ApiError(
+        400,
+        "Video and image posts require media before publishing"
+      );
+    }
+    content.status = req.body.status;
+    content.publishedAt =
+      req.body.status === "published"
+        ? content.publishedAt || new Date()
+        : content.publishedAt;
+    await content.save();
+    return sendResponse(res, 200, "Content moderated", { content });
+  });
 });

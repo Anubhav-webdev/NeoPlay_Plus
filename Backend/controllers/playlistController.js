@@ -5,6 +5,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
 import cloudinary from "../config/cloudinary.js";
+import { withContentMutationLock } from "../services/contentDeletionService.js";
 
 const playlistContentPopulate = {
   path: "contentIds",
@@ -123,21 +124,23 @@ export const updatePlaylist = asyncHandler(async (req, res) => {
 export const addPlaylistItem = asyncHandler(async (req, res) => {
   validateObjectId(req.params.playlistId, "playlistId");
   validateObjectId(req.params.contentId, "contentId");
-  const [playlist, content] = await Promise.all([
-    Playlist.findOne({ _id: req.params.playlistId, userId: req.user._id }),
-    Content.findOne({ _id: req.params.contentId, status: "published" }),
-  ]);
-  if (!playlist) throw new ApiError(404, "Playlist not found");
-  if (!content) throw new ApiError(404, "Published content not found");
-  if (!new Set(["Video", "Image"]).has(content.type)) {
-    throw new ApiError(400, "Only videos and images can be added to playlists");
-  }
-  if (!playlist.contentIds.some((id) => String(id) === String(content._id))) {
-    playlist.contentIds.push(content._id);
-    await playlist.save();
-  }
-  const updated = await populatePlaylistContent(playlist);
-  return sendResponse(res, 200, "Content added to playlist", { playlist: updated });
+  return withContentMutationLock(req.params.contentId, async () => {
+    const [playlist, content] = await Promise.all([
+      Playlist.findOne({ _id: req.params.playlistId, userId: req.user._id }),
+      Content.findOne({ _id: req.params.contentId, status: "published" }),
+    ]);
+    if (!playlist) throw new ApiError(404, "Playlist not found");
+    if (!content) throw new ApiError(404, "Published content not found");
+    if (!new Set(["Video", "Image"]).has(content.type)) {
+      throw new ApiError(400, "Only videos and images can be added to playlists");
+    }
+    if (!playlist.contentIds.some((id) => String(id) === String(content._id))) {
+      playlist.contentIds.push(content._id);
+      await playlist.save();
+    }
+    const updated = await populatePlaylistContent(playlist);
+    return sendResponse(res, 200, "Content added to playlist", { playlist: updated });
+  });
 });
 
 export const removePlaylistItem = asyncHandler(async (req, res) => {
@@ -146,7 +149,7 @@ export const removePlaylistItem = asyncHandler(async (req, res) => {
   const playlist = await Playlist.findOneAndUpdate(
     { _id: req.params.playlistId, userId: req.user._id },
     { $pull: { contentIds: req.params.contentId } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!playlist) throw new ApiError(404, "Playlist not found");
   const updated = await populatePlaylistContent(playlist);

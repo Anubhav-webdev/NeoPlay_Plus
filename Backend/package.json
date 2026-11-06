@@ -16,7 +16,8 @@
     "start": "node Server.js",
     "worker": "node MediaWorker.js",
     "dev:worker": "nodemon MediaWorker.js",
-    "admin:promote": "node scripts/promoteAdmin.js"
+    "admin:promote": "node scripts/promoteAdmin.js",
+    "admin:migrate": "node scripts/migrateAdmins.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -14,12 +14,18 @@ import {
 } from "./services/mediaProcessingService.js";
 import { deleteCloudinaryAsset } from "./services/cloudinaryService.js";
 import { removeOrphanedTempFiles } from "./services/mediaTempCleanup.js";
+import {
+  initializeContentDeletionStorage,
+  processNextContentDeletion,
+  releaseCompletedDeletionLocks,
+} from "./services/contentDeletionService.js";
 
 if (!process.env.DB_URL) throw new Error("DB_URL is required by the media worker");
 if (!process.env.REDIS_URL) throw new Error("REDIS_URL is required by the media worker");
 
 await mongoose.connect(`${process.env.DB_URL}/${DB_NAME}`);
 console.log(`✅ Media worker connected to MongoDB (${mongoose.connection.host})`);
+await initializeContentDeletionStorage();
 
 const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
@@ -143,9 +149,39 @@ const cleanupTimer = setInterval(() => {
 }, 10 * 60 * 1000);
 cleanupTimer.unref();
 
+let contentDeletionSweepRunning = false;
+async function processContentDeletions() {
+  if (contentDeletionSweepRunning) return;
+  contentDeletionSweepRunning = true;
+  try {
+    await releaseCompletedDeletionLocks();
+    for (let count = 0; count < 5; count += 1) {
+      try {
+        if (!(await processNextContentDeletion())) break;
+      } catch (error) {
+        console.error("Content deletion cleanup will be retried", error);
+        break;
+      }
+    }
+  } catch (error) {
+    console.error("Content deletion worker sweep failed", error);
+  } finally {
+    contentDeletionSweepRunning = false;
+  }
+}
+
+await processContentDeletions();
+const contentDeletionTimer = setInterval(() => {
+  processContentDeletions().catch((error) =>
+    console.error("Content deletion worker failed", error),
+  );
+}, 10_000);
+contentDeletionTimer.unref();
+
 async function shutdown(signal) {
   console.log(`Received ${signal}; stopping media worker`);
   clearInterval(cleanupTimer);
+  clearInterval(contentDeletionTimer);
   await worker.close();
   await connection.quit();
   await mongoose.disconnect();

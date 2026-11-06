@@ -44,7 +44,45 @@ published. The dashboard's personal content list is loaded from
 respective frontend feeds; admins can review possible matches at
 `/admin/media-reviews`.
 
+## Permanent content deletion
+
+Admin permanent deletion is queued in MongoDB and processed by the existing
+media worker. The worker first cleans MongoDB references, then removes unshared
+Cloudinary assets and their `MediaAsset` records. Failed steps are retried with
+backoff from the saved deletion record; keep `npm run worker` running for
+cleanup to complete. The delete endpoint returns `202` while cleanup is pending.
+
+The API and worker create the `contentdeletions` and `contentdeletionlocks`
+collections and their indexes on startup. No backfill of existing documents is
+required. Content/asset locks serialize deletion against media linking and
+content interactions, and remain held across retries to prevent assets from
+being reused after a partial external deletion.
+
+Feed, admin, watch-history, and wishlist controllers share pagination and
+content-thumbnail serialization helpers while retaining endpoint-specific
+limits and response shapes.
+
 ## Creating an admin account
+
+Admin accounts are stored separately from regular accounts in the `admins`
+collection. Their name, username, email, and phone number are encrypted with
+AES-256-GCM; identifier lookup uses keyed HMAC digests. Configure
+`ADMIN_DATA_ENCRYPTION_KEY` as a private 32-byte key encoded as 64 hexadecimal
+characters or 43 base64url characters, and
+`ADMIN_LOOKUP_HMAC_KEY` as a separate private secret of at least 32 characters
+in `Backend/.env`. Keep both stable and backed up securely; changing either key
+will make existing admin data inaccessible.
+
+Before deploying this version, configure both keys and migrate existing admin
+accounts once from `Backend`:
+
+```powershell
+npm run admin:migrate
+```
+
+The API will refuse to start while legacy admin records remain in `users`.
+Migration keeps existing account IDs for references, moves the credentials and
+identifiers to `admins`, and anonymizes the corresponding `users` record.
 
 First create a normal account through the frontend using the email you intend
 to administer with. To grant admin access, open a terminal in `Backend` and
@@ -55,9 +93,10 @@ npm run admin:promote -- admin@example.com --confirm
 ```
 
 This is a local maintenance command, not a public API. It requires the
-MongoDB connection in `Backend/.env` and the explicit `--confirm` flag. Keep
-database credentials private and only grant this role to trusted accounts.
-After it succeeds, sign out and sign in again, then open
+MongoDB connection and admin encryption keys in `Backend/.env` and the explicit
+`--confirm` flag. Keep database credentials and encryption keys private and
+only grant admin access to trusted accounts. After it succeeds, sign out and
+sign in again, then open
 `/admin/media-reviews`.
 
 ## Implemented detection and limitations

@@ -1,4 +1,5 @@
 import User from "../models/users.js";
+import { getAdminById, toAdminPrincipal } from "../services/adminDataService.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { verifyAccessToken } from "../services/authService.js";
@@ -17,9 +18,12 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, "Invalid or expired access token");
   }
 
-  const user = await User.findById(payload.sub).select(
-    "_id name username email phoneNumber role isVerified"
-  );
+  const admin = await getAdminById(payload.sub);
+  const user = admin
+    ? toAdminPrincipal(admin)
+    : await User.findById(payload.sub).select(
+        "_id name username email phoneNumber role isVerified"
+      );
   if (!user) throw new ApiError(401, "Account no longer exists");
   req.user = user;
   next();
@@ -34,9 +38,12 @@ export const optionalAuthenticate = asyncHandler(async (req, res, next) => {
     } catch {
       throw new ApiError(401, "Invalid or expired access token");
     }
-    const user = await User.findById(payload.sub).select(
-      "_id name username email phoneNumber role isVerified"
-    );
+    const admin = await getAdminById(payload.sub);
+    const user = admin
+      ? toAdminPrincipal(admin)
+      : await User.findById(payload.sub).select(
+          "_id name username email phoneNumber role isVerified"
+        );
     if (!user) throw new ApiError(401, "Account no longer exists");
     req.user = user;
   }

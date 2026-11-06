@@ -56,7 +56,7 @@ export default function PrivacySafety() {
      
       <div className="relative group cursor-pointer">
             <h2 className="mt-1 text-3xl font-black tracking-tight text-white">
-              <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 sidebar-font">
+              <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 sidebar-font justify-center flex items-center">
                   Neoplay+ Help & Support Zone
                 <span className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 transform scale-x-0 transition-transform duration-300 origin-left group-hover:scale-x-100" />
               </span>

@@ -340,7 +340,7 @@ export const finalizeMediaUpload = asyncHandler(async (req, res) => {
   const claimed = await MediaAsset.findOneAndUpdate(
     { _id: asset._id, ownerId: req.user._id, status: "receiving" },
     { $set: { status: "checking" } },
-    { new: true },
+    { returnDocument: "after" },
   ).select("+stagedPath +chunkDirectory");
   if (!claimed) throw new ApiError(409, "Upload finalization is already in progress");
   asset = claimed;

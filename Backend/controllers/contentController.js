@@ -3,44 +3,20 @@ import Creator from "../models/Creator.js";
 import Category from "../models/Category.js";
 import MediaAsset from "../models/MediaAsset.js";
 import Comment from "../models/Comment.js";
-import Like from "../models/Like.js";
-import Playlist from "../models/Playlist.js";
-import ReplyComment from "../models/ReplyComment.js";
-import Report from "../models/Report.js";
-import WatchHistory from "../models/WatchHistory.js";
-import Wishlist from "../models/Wishlist.js";
-import MediaDuplicateEvent from "../models/MediaDuplicateEvent.js";
+import ContentDeletion from "../models/ContentDeletion.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import { getPagination } from "../utils/pagination.js";
+import { serializeContentWithThumbnail } from "../utils/contentSerialization.js";
 import cloudinary from "../config/cloudinary.js";
-import { deleteCloudinaryAsset } from "../services/cloudinaryService.js";
-
-function toContentObject(content) {
-  const value = content.toObject ? content.toObject() : content;
-  const thumbnailAssetUrl = value.thumbnailAssetId?.secureUrl;
-  const generatedVideoPoster = value.type === "Video" && value.mediaPublicId
-    ? cloudinary.url(value.mediaPublicId, {
-        resource_type: "video",
-        format: "jpg",
-        transformation: [{ start_offset: "0" }],
-      })
-    : null;
-  return {
-    ...value,
-    thumbnailUrl: value.thumbnailUrl || thumbnailAssetUrl || generatedVideoPoster || null,
-  };
-}
-
-function pagination(query) {
-  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
-  const limit = Math.min(
-    50,
-    Math.max(1, Number.parseInt(query.limit, 10) || 20)
-  );
-  return { page, limit, skip: (page - 1) * limit };
-}
+import {
+  findContentAssets,
+  schedulePermanentContentDeletion,
+  withAssetMutationLocks,
+  withContentMutationLock,
+} from "../services/contentDeletionService.js";
 
 async function canManageContent(user, content) {
   if (user.role === "admin") return true;
@@ -53,7 +29,10 @@ async function canManageContent(user, content) {
 
 // List published media with bounded pagination and optional filters.
 export const listContent = asyncHandler(async (req, res) => {
-  const { page, limit, skip } = pagination(req.query);
+  const { page, limit, skip } = getPagination(req.query, {
+    defaultLimit: 20,
+    maxLimit: 50,
+  });
   const filter = { status: "published" };
   if (req.query.type) filter.type = req.query.type;
   if (req.query.creatorId) {
@@ -101,7 +80,7 @@ export const listContent = asyncHandler(async (req, res) => {
   );
   return sendResponse(res, 200, "Content retrieved", {
     items: items.map((item) => ({
-      ...toContentObject(item),
+      ...serializeContentWithThumbnail(item, cloudinary),
       commentCount: countsByContentId.get(String(item._id)) || 0,
     })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
@@ -127,7 +106,7 @@ export const getContent = asyncHandler(async (req, res) => {
     if (!ownedCreator) throw new ApiError(404, "Content not found");
   }
   return sendResponse(res, 200, "Content retrieved", {
-    content: toContentObject(content),
+    content: serializeContentWithThumbnail(content, cloudinary),
   });
 });
 
@@ -135,19 +114,29 @@ export const listMyContent = asyncHandler(async (req, res) => {
   const creator = await Creator.findOne({ userId: req.user._id });
   if (!creator)
     return sendResponse(res, 200, "Creator content retrieved", { items: [] });
-  const { page, limit, skip } = pagination(req.query);
+  const { page, limit, skip } = getPagination(req.query, {
+    defaultLimit: 20,
+    maxLimit: 50,
+  });
+  const pendingDeletions = await ContentDeletion.find({
+    status: { $ne: "completed" },
+  }).distinct("contentId");
+  const filter = {
+    creatorId: creator._id,
+    _id: { $nin: pendingDeletions },
+  };
   const [items, total] = await Promise.all([
-    Content.find({ creatorId: creator._id })
+    Content.find(filter)
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate("categoryIds", "name slug")
       .populate("mediaAssetId", "mediaType")
       .populate("thumbnailAssetId", "secureUrl"),
-    Content.countDocuments({ creatorId: creator._id }),
+    Content.countDocuments(filter),
   ]);
   return sendResponse(res, 200, "Creator content retrieved", {
-    items: items.map(toContentObject),
+    items: items.map((item) => serializeContentWithThumbnail(item, cloudinary)),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 });
@@ -219,162 +208,218 @@ export const createContent = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Video posts require a verified image thumbnail");
   }
 
-  const isPublished = req.body.publish === true;
-  const content = await Content.create({
-    creatorId: creator._id,
-    type,
-    title: title.trim(),
-    description: description.trim(),
-    thumbnailUrl: thumbnail?.secureUrl || null,
-    thumbnailAssetId: thumbnail?._id || null,
-    mediaUrl: media?.secureUrl || null,
-    mediaPublicId: media?.publicId || null,
-    mediaAssetId: media?._id || null,
-    categoryIds,
-    status: isPublished ? "published" : "draft",
-    publishedAt: isPublished ? new Date() : null,
-  });
-  return sendResponse(res, 201, "Content created", { content });
+  return withAssetMutationLocks(
+    [media, thumbnail].filter(Boolean),
+    async () => {
+      if (media) {
+        media = await MediaAsset.findOne({
+          _id: media._id,
+          ownerId: req.user._id,
+          creatorId: creator._id,
+          status: "ready",
+        });
+        if (!media) {
+          throw new ApiError(409, "Media is being deleted; retry with another upload");
+        }
+      }
+      if (thumbnail && type !== "Image") {
+        thumbnail = await MediaAsset.findOne({
+          _id: thumbnail._id,
+          ownerId: req.user._id,
+          creatorId: creator._id,
+          mediaType: "image",
+          status: "ready",
+        });
+        if (!thumbnail) {
+          throw new ApiError(409, "Thumbnail is being deleted; retry with another upload");
+        }
+      }
+      if (type === "Image") thumbnail = media;
+
+      const isPublished = req.body.publish === true;
+      const content = await Content.create({
+        creatorId: creator._id,
+        type,
+        title: title.trim(),
+        description: description.trim(),
+        thumbnailUrl: thumbnail?.secureUrl || null,
+        thumbnailAssetId: thumbnail?._id || null,
+        mediaUrl: media?.secureUrl || null,
+        mediaPublicId: media?.publicId || null,
+        mediaAssetId: media?._id || null,
+        categoryIds,
+        status: isPublished ? "published" : "draft",
+        publishedAt: isPublished ? new Date() : null,
+      });
+      return sendResponse(res, 201, "Content created", { content });
+    },
+  );
 });
 
 export const updateContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findById(req.params.contentId);
-  if (!content) throw new ApiError(404, "Content not found");
-  if (!(await canManageContent(req.user, content))) {
-    throw new ApiError(403, "You cannot edit this content");
-  }
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findById(req.params.contentId);
+    if (!content) throw new ApiError(404, "Content not found");
+    if (!(await canManageContent(req.user, content))) {
+      throw new ApiError(403, "You cannot edit this content");
+    }
 
-  const allowed = [
-    "type",
-    "title",
-    "description",
-    "mediaAssetId",
-  ];
-  for (const key of allowed) {
-    if (req.body[key] !== undefined) content[key] = req.body[key];
-  }
-  if (req.body.mediaAssetId !== undefined) {
-    validateObjectId(req.body.mediaAssetId, "mediaAssetId");
-    const media = await MediaAsset.findOne({
-      _id: req.body.mediaAssetId,
-      ownerId: req.user._id,
-      creatorId: content.creatorId,
-      status: "ready",
-    });
-    if (!media) {
-      throw new ApiError(400, "Use a completed, verified media upload you own");
-    }
-    if (
-      (content.type === "Video" && media.mediaType !== "video") ||
-      (content.type === "Image" && media.mediaType !== "image")
-    ) {
-      throw new ApiError(400, "The uploaded media type does not match the post type");
-    }
-    content.mediaUrl = media.secureUrl;
-    content.mediaPublicId = media.publicId;
-    content.mediaAssetId = media._id;
-    if (content.type === "Image") {
-      content.thumbnailUrl = media.secureUrl;
-      content.thumbnailAssetId = media._id;
-    }
-  }
-  if (content.mediaAssetId) {
-    const contentCreator = req.user.role === "admin"
-      ? await Creator.findById(content.creatorId).select("userId")
-      : null;
-    const media = await MediaAsset.findOne({
-      _id: content.mediaAssetId,
-      ownerId: contentCreator?.userId || req.user._id,
-      creatorId: content.creatorId,
-      status: "ready",
-    });
-    if (
-      !media ||
-      (content.type === "Video" && media.mediaType !== "video") ||
-      (content.type === "Image" && media.mediaType !== "image")
-    ) {
-      throw new ApiError(400, "The content type requires a matching verified media asset");
-    }
-    content.mediaUrl = media.secureUrl;
-    content.mediaPublicId = media.publicId;
-  }
-  if (req.body.thumbnailAssetId !== undefined) {
-    if (req.body.thumbnailAssetId === null) {
-      if (content.type === "Video" && content.status === "published") {
-        throw new ApiError(400, "Published videos must keep a thumbnail");
+    for (const field of ["mediaAssetId", "thumbnailAssetId"]) {
+      if (req.body[field] !== undefined && req.body[field] !== null) {
+        validateObjectId(req.body[field], field);
       }
-      content.thumbnailAssetId = null;
-      content.thumbnailUrl = null;
-    } else {
-      validateObjectId(req.body.thumbnailAssetId, "thumbnailAssetId");
-      const thumbnail = await MediaAsset.findOne({
-        _id: req.body.thumbnailAssetId,
-        ownerId: req.user._id,
-        creatorId: content.creatorId,
-        mediaType: "image",
-        status: "ready",
-      });
-      if (!thumbnail) {
-        throw new ApiError(400, "Use a completed, verified image upload for the thumbnail");
+    }
+    const currentAssets = await findContentAssets(content);
+    const requestedIds = [
+      req.body.mediaAssetId,
+      req.body.thumbnailAssetId,
+    ].filter((id) => id && id !== null);
+    const requestedAssets = requestedIds.length
+      ? await MediaAsset.find({ _id: { $in: requestedIds } })
+          .select("+pendingCloudinaryPublicId")
+          .lean()
+      : [];
+    return withAssetMutationLocks(
+      [...currentAssets, ...requestedAssets],
+      async () => {
+        const allowed = [
+          "type",
+          "title",
+          "description",
+          "mediaAssetId",
+        ];
+        for (const key of allowed) {
+          if (req.body[key] !== undefined) content[key] = req.body[key];
+        }
+        if (req.body.mediaAssetId !== undefined) {
+          validateObjectId(req.body.mediaAssetId, "mediaAssetId");
+          const media = await MediaAsset.findOne({
+            _id: req.body.mediaAssetId,
+            ownerId: req.user._id,
+            creatorId: content.creatorId,
+            status: "ready",
+          });
+          if (!media) {
+            throw new ApiError(400, "Use a completed, verified media upload you own");
+          }
+          if (
+            (content.type === "Video" && media.mediaType !== "video") ||
+            (content.type === "Image" && media.mediaType !== "image")
+          ) {
+            throw new ApiError(400, "The uploaded media type does not match the post type");
+          }
+          content.mediaUrl = media.secureUrl;
+          content.mediaPublicId = media.publicId;
+          content.mediaAssetId = media._id;
+          if (content.type === "Image") {
+            content.thumbnailUrl = media.secureUrl;
+            content.thumbnailAssetId = media._id;
+          }
+        }
+        if (content.mediaAssetId) {
+          const contentCreator = req.user.role === "admin"
+            ? await Creator.findById(content.creatorId).select("userId")
+            : null;
+          const media = await MediaAsset.findOne({
+            _id: content.mediaAssetId,
+            ownerId: contentCreator?.userId || req.user._id,
+            creatorId: content.creatorId,
+            status: "ready",
+          });
+          if (
+            !media ||
+            (content.type === "Video" && media.mediaType !== "video") ||
+            (content.type === "Image" && media.mediaType !== "image")
+          ) {
+            throw new ApiError(400, "The content type requires a matching verified media asset");
+          }
+          content.mediaUrl = media.secureUrl;
+          content.mediaPublicId = media.publicId;
+        }
+        if (req.body.thumbnailAssetId !== undefined) {
+          if (req.body.thumbnailAssetId === null) {
+            if (content.type === "Video" && content.status === "published") {
+              throw new ApiError(400, "Published videos must keep a thumbnail");
+            }
+            content.thumbnailAssetId = null;
+            content.thumbnailUrl = null;
+          } else {
+            validateObjectId(req.body.thumbnailAssetId, "thumbnailAssetId");
+            const thumbnail = await MediaAsset.findOne({
+              _id: req.body.thumbnailAssetId,
+              ownerId: req.user._id,
+              creatorId: content.creatorId,
+              mediaType: "image",
+              status: "ready",
+            });
+            if (!thumbnail) {
+              throw new ApiError(400, "Use a completed, verified image upload for the thumbnail");
+            }
+            content.thumbnailAssetId = thumbnail._id;
+            content.thumbnailUrl = thumbnail.secureUrl;
+          }
+        }
+        if (req.body.categoryIds !== undefined) {
+          if (
+            !Array.isArray(req.body.categoryIds) ||
+            req.body.categoryIds.length > 20
+          ) {
+            throw new ApiError(400, "categoryIds must be an array of at most 20 IDs");
+          }
+          req.body.categoryIds.forEach((id) => validateObjectId(id, "categoryId"));
+          const count = await Category.countDocuments({
+            _id: { $in: req.body.categoryIds },
+          });
+          if (count !== new Set(req.body.categoryIds.map(String)).size) {
+            throw new ApiError(400, "One or more categories do not exist");
+          }
+          content.categoryIds = req.body.categoryIds;
+        }
+        await content.save();
+        return sendResponse(res, 200, "Content updated", { content });
       }
-      content.thumbnailAssetId = thumbnail._id;
-      content.thumbnailUrl = thumbnail.secureUrl;
-    }
-  }
-  if (req.body.categoryIds !== undefined) {
-    if (
-      !Array.isArray(req.body.categoryIds) ||
-      req.body.categoryIds.length > 20
-    ) {
-      throw new ApiError(400, "categoryIds must be an array of at most 20 IDs");
-    }
-    req.body.categoryIds.forEach((id) => validateObjectId(id, "categoryId"));
-    const count = await Category.countDocuments({
-      _id: { $in: req.body.categoryIds },
-    });
-    if (count !== new Set(req.body.categoryIds.map(String)).size) {
-      throw new ApiError(400, "One or more categories do not exist");
-    }
-    content.categoryIds = req.body.categoryIds;
-  }
-  await content.save();
-  return sendResponse(res, 200, "Content updated", { content });
+    );
+  });
 });
 
 export const publishContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findById(req.params.contentId);
-  if (!content) throw new ApiError(404, "Content not found");
-  if (!(await canManageContent(req.user, content))) {
-    throw new ApiError(403, "You cannot publish this content");
-  }
-  if (content.type !== "Tweet" && !content.mediaUrl) {
-    throw new ApiError(
-      400,
-      "Video and image posts require media before publishing"
-    );
-  }
-  if (content.type === "Video" && !content.thumbnailUrl) {
-    throw new ApiError(400, "Add a video thumbnail before publishing");
-  }
-  content.status = "published";
-  content.publishedAt = content.publishedAt || new Date();
-  await content.save();
-  return sendResponse(res, 200, "Content published", { content });
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findById(req.params.contentId);
+    if (!content) throw new ApiError(404, "Content not found");
+    if (!(await canManageContent(req.user, content))) {
+      throw new ApiError(403, "You cannot publish this content");
+    }
+    if (content.type !== "Tweet" && !content.mediaUrl) {
+      throw new ApiError(
+        400,
+        "Video and image posts require media before publishing"
+      );
+    }
+    if (content.type === "Video" && !content.thumbnailUrl) {
+      throw new ApiError(400, "Add a video thumbnail before publishing");
+    }
+    content.status = "published";
+    content.publishedAt = content.publishedAt || new Date();
+    await content.save();
+    return sendResponse(res, 200, "Content published", { content });
+  });
 });
 
 // Archive instead of hard-deleting so comments and history keep valid references.
 export const archiveContent = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findById(req.params.contentId);
-  if (!content) throw new ApiError(404, "Content not found");
-  if (!(await canManageContent(req.user, content))) {
-    throw new ApiError(403, "You cannot archive this content");
-  }
-  content.status = "archived";
-  await content.save();
-  return sendResponse(res, 200, "Content archived", { content });
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findById(req.params.contentId);
+    if (!content) throw new ApiError(404, "Content not found");
+    if (!(await canManageContent(req.user, content))) {
+      throw new ApiError(403, "You cannot archive this content");
+    }
+    content.status = "archived";
+    await content.save();
+    return sendResponse(res, 200, "Content archived", { content });
+  });
 });
 
 export const permanentlyDeleteContent = asyncHandler(async (req, res) => {
@@ -382,149 +427,21 @@ export const permanentlyDeleteContent = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only administrators can permanently delete content");
   }
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findById(req.params.contentId);
-  if (!content) throw new ApiError(404, "Content not found");
-
-  const assetIds = [
-    ...new Set(
-      [content.mediaAssetId, content.thumbnailAssetId]
-        .filter(Boolean)
-        .map(String),
-    ),
-  ];
-  const assetQuery = [
-    ...(assetIds.length ? [{ _id: { $in: assetIds } }] : []),
-    ...(content.mediaPublicId ? [{ publicId: content.mediaPublicId }] : []),
-    ...(content.thumbnailUrl ? [{ secureUrl: content.thumbnailUrl }] : []),
-  ];
-  const assets = assetQuery.length
-    ? await MediaAsset.find({ $or: assetQuery })
-        .select("+stagedPath +pendingCloudinaryPublicId")
-        .lean()
-    : [];
-  const deletableAssets = [];
-  for (const asset of assets) {
-    const sharedAssetReferences = [
-      { mediaAssetId: asset._id },
-      { thumbnailAssetId: asset._id },
-      ...(asset.publicId ? [{ mediaPublicId: asset.publicId }] : []),
-      ...(asset.secureUrl ? [{ mediaUrl: asset.secureUrl }] : []),
-      ...(asset.secureUrl ? [{ thumbnailUrl: asset.secureUrl }] : []),
-    ];
-    const isUsedElsewhere = await Content.exists({
-      _id: { $ne: content._id },
-      $or: sharedAssetReferences,
-    });
-    if (!isUsedElsewhere) deletableAssets.push(asset);
-  }
-
-  const deletionTargets = new Map();
-  for (const asset of deletableAssets) {
-    const publicId =
-      asset.publicId ||
-      asset.pendingCloudinaryPublicId ||
-      `neoplay/media/${asset.ownerId}/${asset._id}`;
-    const resourceType = asset.resourceType || asset.mediaType;
-    deletionTargets.set(`${resourceType}:${publicId}`, {
-      publicId,
-      resourceType,
-    });
-  }
-  if (
-    content.mediaPublicId &&
-    !assets.some(
-      (asset) =>
-        asset.publicId === content.mediaPublicId ||
-        String(asset._id) === String(content.mediaAssetId),
-    )
-  ) {
-    const usedElsewhere = await Content.exists({
-      _id: { $ne: content._id },
-      mediaPublicId: content.mediaPublicId,
-    });
-    if (!usedElsewhere) {
-      const linkedAsset = assets.find(
-        (asset) => String(asset._id) === String(content.mediaAssetId),
-      );
-      const urlResourceType = content.mediaUrl?.match(
-        /\/(image|video)\/upload\//,
-      )?.[1];
-      const resourceType =
-        linkedAsset?.resourceType ||
-        linkedAsset?.mediaType ||
-        (content.type === "Video" ? "video" : null) ||
-        (content.type === "Image" ? "image" : null) ||
-        urlResourceType;
-      if (!resourceType) {
-        throw new ApiError(
-          409,
-          "Unable to determine the media type; content and media were not deleted.",
-        );
-      }
-      deletionTargets.set(`${resourceType}:${content.mediaPublicId}`, {
-        publicId: content.mediaPublicId,
-        resourceType,
-      });
-    }
-  }
-
-  try {
-    for (const target of deletionTargets.values()) {
-      await deleteCloudinaryAsset(target.publicId, target.resourceType);
-    }
-  } catch (error) {
-    console.error("Could not remove media during permanent content deletion", {
-      contentId: content.id,
-      error,
-    });
-    throw new ApiError(
-      503,
-      "Media could not be permanently deleted; the content was not removed. Please retry.",
-    );
-  }
-
-  const deletableAssetIds = deletableAssets.map((asset) => asset._id);
-  const cleanupOperations = [
-    (async () => {
-      const commentIds = await Comment.distinct("_id", {
-        contentId: content._id,
-      });
-      await Promise.all([
-        ReplyComment.deleteMany({ commentId: { $in: commentIds } }),
-        Comment.deleteMany({ _id: { $in: commentIds } }),
-      ]);
-    })(),
-    Like.deleteMany({ contentId: content._id }),
-    WatchHistory.deleteMany({ contentId: content._id }),
-    Wishlist.deleteMany({ contentId: content._id }),
-    Report.deleteMany({ contentId: content._id }),
-    Playlist.updateMany(
-      { contentIds: content._id },
-      { $pull: { contentIds: content._id } },
-    ),
-  ];
-  if (deletableAssetIds.length) {
-    cleanupOperations.push(
-      MediaDuplicateEvent.updateMany(
-        {
-          $or: [
-            { uploadAssetId: { $in: deletableAssetIds } },
-            { matchAssetId: { $in: deletableAssetIds } },
-          ],
-        },
-        { $unset: { uploadAssetId: 1, matchAssetId: 1 } },
-      ),
-      MediaAsset.deleteMany({ _id: { $in: deletableAssetIds } }),
-    );
-  }
-  await Promise.all(cleanupOperations);
-
-  const result = await Content.deleteOne({ _id: content._id });
-  if (!result.deletedCount) throw new ApiError(404, "Content not found");
-  return sendResponse(res, 200, "Content and unshared media permanently deleted", {
-    contentId: content.id,
-    deletedMediaAssets: deletableAssetIds.length,
-  });
+  const job = await schedulePermanentContentDeletion(req.params.contentId);
+  const completed = job.status === "completed";
+  return sendResponse(
+    res,
+    completed ? 200 : 202,
+    completed
+      ? "Content and unshared media permanently deleted"
+      : "Permanent content deletion queued",
+    {
+      contentId: req.params.contentId,
+      deletionId: job.id,
+      status: job.status,
+      plannedMediaAssets: job.deletableAssetIds.length,
+    },
+  );
 });
 
 export const incrementView = asyncHandler(async (req, res) => {
@@ -532,7 +449,7 @@ export const incrementView = asyncHandler(async (req, res) => {
   const content = await Content.findOneAndUpdate(
     { _id: req.params.contentId, status: "published" },
     { $inc: { viewCount: 1 } },
-    { new: true, projection: { viewCount: 1 } }
+    { returnDocument: "after", projection: { viewCount: 1 } }
   );
   if (!content) throw new ApiError(404, "Content not found");
   return sendResponse(res, 200, "View recorded", {

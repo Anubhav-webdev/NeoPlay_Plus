@@ -1,16 +1,19 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-async function readResponse(response) {
+async function readResponse(response, failureLabel = "Request failed") {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(
-      body.message || `Request failed (${response.status})`,
-    );
+    const error = new Error(body.message || `${failureLabel} (${response.status})`);
     error.status = response.status;
     throw error;
   }
   return body;
+}
+
+export async function publicApiFetch(path, options = {}, failureLabel) {
+  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  return readResponse(response, failureLabel);
 }
 
 let refreshInProgress;

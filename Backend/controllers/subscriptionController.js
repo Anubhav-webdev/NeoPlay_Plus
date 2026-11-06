@@ -10,10 +10,26 @@ export const listSubscriptions = asyncHandler(async (req, res) => {
   const subscriptions = await Subscription.find({ subscriberId: req.user._id })
     .sort({ createdAt: -1 })
     .populate("creatorId", "displayName avatar applicationStatus");
+  const approvedSubscriptions = subscriptions.filter(
+    (subscription) => subscription.creatorId?.applicationStatus === "approved"
+  );
+  const creatorIds = approvedSubscriptions.map((subscription) => subscription.creatorId._id);
+  const subscriberCounts = await Subscription.aggregate([
+    { $match: { creatorId: { $in: creatorIds } } },
+    { $group: { _id: "$creatorId", count: { $sum: 1 } } },
+  ]);
+  const countsByCreatorId = new Map(
+    subscriberCounts.map(({ _id, count }) => [String(_id), count])
+  );
   return sendResponse(res, 200, "Subscriptions retrieved", {
-    subscriptions: subscriptions.filter(
-      (subscription) => subscription.creatorId?.applicationStatus === "approved"
-    ),
+    subscriptions: approvedSubscriptions.map((subscription) => {
+      const result = subscription.toObject();
+      result.creatorId = {
+        ...result.creatorId,
+        subscriberCount: countsByCreatorId.get(String(result.creatorId._id)) || 0,
+      };
+      return result;
+    }),
   });
 });
 

@@ -8,6 +8,12 @@ import errorHandler from "./middlewares/errorHandler.js";
 import ApiError from  "./utils/ApiError.js"
 
 const app = express();
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0);
+if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0) {
+  throw new Error("TRUST_PROXY_HOPS must be a non-negative integer");
+}
+app.set("trust proxy", trustProxyHops);
+
 const configuredOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim())

@@ -124,24 +124,12 @@ export default function TweetCard({ tweet }) {
             />
 
             <div>
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-1 gap-1 mb-2">
                 <span className="font-bold text-slate-100 text-sm tracking-wide">
                   {tweet.name}
-                </span>
-                {tweet.verified && (
+                </span>              
                   <FiCheckCircle className="text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" size={14} />
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5    min-w-64">
-                <span className="text-slate-500">@{tweet.handle}</span>
-                <span className="text-slate-700">•</span>
-                <span className="font-medium text-slate-400">
-                  {formatTimeAgo(tweet.time || tweet.createdAt)}
-                </span>
-                <span className="text-slate-700">•</span>
-
-                <button
+                  <button
                   onClick={toggleFollow}
                   disabled={isSavingFollow || !tweet.creatorId}
                   className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-95 ${
@@ -152,6 +140,14 @@ export default function TweetCard({ tweet }) {
                 >
                   {isFollowing ? "Following" : "Follow"}
                 </button>
+              </div>
+
+              <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5 min-w-64 ml-1">
+                <span className="text-slate-500">@{tweet.handle}</span>
+                <span className="text-slate-700">•</span>
+                <span className="font-medium text-slate-400">
+                  {formatTimeAgo(tweet.time || tweet.createdAt)}
+                </span>
               </div>
             </div>
           </div>

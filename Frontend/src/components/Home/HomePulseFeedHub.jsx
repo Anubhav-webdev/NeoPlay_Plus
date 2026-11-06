@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import TweetCard from "../Tweet/TweetCard";
+import HorizontalRow from "../common/HorizontalRow";
 import { getPublishedContent } from "../../api/contentApi";
 import { C } from "./homeTokens";
-import useHScroll from "./useHScroll";
-import { ScrollButtons, ChannelLabel } from "./HomePrimitives";
+import { ChannelLabel } from "./HomePrimitives";
 
 export default function HomePulseFeed() {
-  const [pulseRef, scrollPulse] = useHScroll();
   const [tweets, setTweets] = useState([]);
   const [error, setError] = useState("");
 
@@ -51,34 +50,38 @@ export default function HomePulseFeed() {
       transition={{ duration: 0.5 }}
       className="lg:col-span-2 min-w-0"
     >
-      <div className="flex items-center justify-between mb-5">
-        <ChannelLabel title="Pulse Feed" />
-        <ScrollButtons
-          onPrev={() => scrollPulse(-1)}
-          onNext={() => scrollPulse(1)}
-          accent={C.purple}
-        />
-      </div>
-      {error && <p role="status" className="mb-3 text-xs text-amber-300">Could not load posts: {error}</p>}
-      <div
-        ref={pulseRef}
-        className="hide-scrollbar flex gap-4 overflow-x-auto pb-1 snap-x snap-mandatory"
+      <HorizontalRow
+        title={<ChannelLabel title="Pulse Feed" />}
+        variant="home"
+        accent={C.purple}
+        scrollStep={0.82}
+        className="mb-0"
       >
-        {tweets.length === 0 ? (
-          <p className="py-8 text-sm text-zinc-500">{error ? "Posts are unavailable until the feed can be loaded." : "No published posts yet."}</p>
-        ) : tweets.map((tweet, idx) => (
-          <motion.div
-            key={tweet.id}
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: idx * 0.06, duration: 0.3 }}
-            className="snap-start shrink-0 w-[85%] sm:w-96 lg:w-full"
-          >
-            <TweetCard tweet={tweet} />
-          </motion.div>
-        ))}
-      </div>
+        {(pulseRef) => (
+          <>
+            {error && <p role="status" className="mb-3 text-xs text-amber-300">Could not load posts: {error}</p>}
+            <div
+              ref={pulseRef}
+              className="hide-scrollbar flex gap-4 overflow-x-auto pb-1 snap-x snap-mandatory"
+            >
+              {tweets.length === 0 ? (
+                <p className="py-8 text-sm text-zinc-500">{error ? "Posts are unavailable until the feed can be loaded." : "No published posts yet."}</p>
+              ) : tweets.map((tweet, idx) => (
+                <motion.div
+                  key={tweet.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.06, duration: 0.3 }}
+                  className="snap-start shrink-0 w-[85%] sm:w-96 lg:w-full"
+                >
+                  <TweetCard tweet={tweet} />
+                </motion.div>
+              ))}
+            </div>
+          </>
+        )}
+      </HorizontalRow>
     </motion.section>
   );
 }

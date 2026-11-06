@@ -1,19 +1,7 @@
-import { apiFetch } from "./mediaApi";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-
-async function publicGet(path, { signal } = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, { signal });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(result.message || `Request failed (${response.status})`);
-  }
-  return result;
-}
+import { apiFetch, publicApiFetch } from "./mediaApi";
 
 export async function getContentComments(contentId, { signal } = {}) {
-  const result = await publicGet(
+  const result = await publicApiFetch(
     `/comments/content/${encodeURIComponent(contentId)}`,
     { signal },
   );
@@ -38,7 +26,7 @@ export async function addContentComment(contentId, text) {
 }
 
 export async function getCommentReplies(commentId, { signal } = {}) {
-  const result = await publicGet(
+  const result = await publicApiFetch(
     `/comments/${encodeURIComponent(commentId)}/replies`,
     { signal },
   );

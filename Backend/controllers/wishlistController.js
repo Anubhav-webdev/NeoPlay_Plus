@@ -4,21 +4,9 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
 import validateObjectId from "../utils/validateObjectId.js";
+import { serializeContentReference } from "../utils/contentSerialization.js";
 import cloudinary from "../config/cloudinary.js";
-
-function serializeWishlistItem(item) {
-  const content = item.contentId?.toObject ? item.contentId.toObject() : item.contentId;
-  if (!content) return item;
-  const thumbnailUrl = content.thumbnailUrl || content.thumbnailAssetId?.secureUrl ||
-    (content.type === "Video" && content.mediaPublicId
-      ? cloudinary.url(content.mediaPublicId, {
-          resource_type: "video",
-          format: "jpg",
-          transformation: [{ start_offset: "0" }],
-        })
-      : null);
-  return { ...item.toObject(), contentId: { ...content, thumbnailUrl } };
-}
+import { withContentMutationLock } from "../services/contentDeletionService.js";
 
 export const listWishlist = asyncHandler(async (req, res) => {
   const savedItems = await Wishlist.find({ userId: req.user._id })
@@ -35,23 +23,27 @@ export const listWishlist = asyncHandler(async (req, res) => {
       ],
     });
   return sendResponse(res, 200, "Wishlist retrieved", {
-    items: savedItems.filter((item) => item.contentId).map(serializeWishlistItem),
+    items: savedItems
+      .filter((item) => item.contentId)
+      .map((item) => serializeContentReference(item, cloudinary)),
   });
 });
 
 export const addWishlistItem = asyncHandler(async (req, res) => {
   validateObjectId(req.params.contentId, "contentId");
-  const content = await Content.findOne({
-    _id: req.params.contentId,
-    status: "published",
+  return withContentMutationLock(req.params.contentId, async () => {
+    const content = await Content.findOne({
+      _id: req.params.contentId,
+      status: "published",
+    });
+    if (!content) throw new ApiError(404, "Published content not found");
+    await Wishlist.updateOne(
+      { userId: req.user._id, contentId: content._id },
+      { $setOnInsert: { userId: req.user._id, contentId: content._id } },
+      { upsert: true }
+    );
+    return sendResponse(res, 200, "Content saved to wishlist", { saved: true });
   });
-  if (!content) throw new ApiError(404, "Published content not found");
-  await Wishlist.updateOne(
-    { userId: req.user._id, contentId: content._id },
-    { $setOnInsert: { userId: req.user._id, contentId: content._id } },
-    { upsert: true }
-  );
-  return sendResponse(res, 200, "Content saved to wishlist", { saved: true });
 });
 
 export const removeWishlistItem = asyncHandler(async (req, res) => {

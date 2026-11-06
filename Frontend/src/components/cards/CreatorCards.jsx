@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
-import { Flame, TrendingUp, MoreVertical } from 'lucide-react';
+import { Flame, User2, UserCheck, Check, UserPlus } from 'lucide-react';
 import {
   getCreatorSubscriptionStatus,
   setCreatorSubscribed,
@@ -15,120 +15,123 @@ export default function CreatorCard({
   const user = useSelector((state) => state.auth.user);
   const navigate = useNavigate();
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const creatorId = creator?._id || creator?.id;
 
   useEffect(() => {
-    if (!creator?._id && !creator?.id) return undefined;
-    if (!user) return undefined;
+    if (!creatorId || !user) return;
     const controller = new AbortController();
-    getCreatorSubscriptionStatus(creator._id || creator.id, { signal: controller.signal })
+
+    getCreatorSubscriptionStatus(creatorId, { signal: controller.signal })
       .then((status) => {
         if (!controller.signal.aborted) setIsFollowing(status.subscribed);
       })
-      .catch((loadError) => {
-        if (!controller.signal.aborted) setError(loadError.message);
-      });
+      .catch(() => {});
+
     return () => controller.abort();
-  }, [creator?._id, creator?.id, user]);
+  }, [creatorId, user]);
 
   const toggleSubscription = async () => {
     if (!user) {
       navigate("/signup");
       return;
     }
-    const creatorId = creator?._id || creator?.id;
-    if (!creatorId) return;
-    setIsUpdating(true);
-    setError("");
+    if (!creatorId || isLoading) return;
+    
+    setIsLoading(true);
     try {
       const result = await setCreatorSubscribed(creatorId, !isFollowing);
       setIsFollowing(result.subscribed);
-    } catch (updateError) {
-      setError(updateError.message || "Could not update subscription.");
+    } catch (err) {
+      console.error("Error toggling subscription:", err);
     } finally {
-      setIsUpdating(false);
+      setIsLoading(false);
     }
   };
 
-  // Enhanced guard fallback engine: Checks if creator object or its core properties are missing
-  const activeCreator = (creator && creator.name) ? creator : {
-    name: creator?.username || creator?.creatorName || "Anonymous Creator",
-    handle: creator?.handle || creator?.tag || "@creator"
+  const handleNavigate = () => {
+    if (creatorId) {
+      navigate(`/creator/${creatorId}`);
+    }
   };
 
   return (
     <motion.div
-      whileHover={{ y: -5 }}
-      className="flex-shrink-0 w-52 bg-gradient-to-b from-zinc-900 to-zinc-950 border border-zinc-800 rounded-2xl p-5 relative group snap-start flex flex-col justify-between min-h-[270px] overflow-hidden header-font"
+      whileHover={{ y: -6 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      className="group relative flex-shrink-0 w-56 min-h-[300px] flex flex-col justify-between p-5 rounded-3xl bg-zinc-900/60 backdrop-blur-md border border-zinc-800/80 hover:border-cyan-500/30 transition-all duration-300 shadow-xl overflow-hidden snap-start"
     >
-      {/* Subtle top border hover illumination glow */}
-      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent opacity-0 transition-opacity duration-500" />
+      {/* Background Ambient Glow on Hover */}
+      <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl group-hover:bg-cyan-500/20 transition-all duration-500 pointer-events-none" />
 
-      <div className="flex items-center justify-between w-full mb-3 relative z-10 min-h-[24px]">
-        {/* Position counter indicator */}
-        <div className="bg-zinc-900 border border-zinc-800 text-[10px] font-bold px-2 py-0.5 rounded-md text-zinc-400 group-hover:border-cyan-500/40 group-hover:text-cyan-400 flex items-center gap-1 select-none">
-          <Flame size={10} className="text-orange-500 animate-pulse" /> #{displayIndex + 1}
+      {/* Header Badges */}
+      <div className="flex items-center justify-between w-full z-10">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/80 border border-zinc-800/80 text-[11px] font-semibold text-zinc-400 group-hover:border-orange-500/30 transition-colors">
+          <Flame size={12} className="text-orange-500 animate-pulse" />
+          <span>#{displayIndex + 1}</span>
         </div>
-        
-        {/* Three-dot menu dynamically slides/fades in only when following */}
-        {isFollowing ? (
-          <motion.button 
-            initial={{ opacity: 0, x: 5 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-zinc-500 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800/60"
-          >
-            <MoreVertical size={14} />
-          </motion.button>
-        ) : (
-          /* Empty space maintainer to prevent layout shifts */
-          <div className="w-5 h-5" />
-        )}
+
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/80 border border-zinc-800/80 text-[11px] font-medium text-zinc-400">
+          <UserCheck size={13} className="text-emerald-400" />
+          <span>{(creator?.subscriberCount || 0).toLocaleString()}</span>
+        </div>
       </div>
 
-      {/* Avatar & Profile Information */}
-      <div className="text-center flex-1 flex flex-col justify-center">
+      {/* Profile Details */}
+      <div className="flex flex-col items-center text-center my-auto pt-2 z-10">
         <button
           type="button"
-          onClick={() => activeCreator.id && navigate(`/creator/${activeCreator.id}`)}
-          aria-label={`View ${activeCreator.name}'s profile`}
-          className="group relative w-20 h-20 mx-auto mb-3 rounded-full p-[2px] overflow-hidden bg-zinc-800 cursor-pointer"
+          onClick={handleNavigate}
+          aria-label={`View ${creator?.name || 'creator'}'s profile`}
+          className="relative w-24 h-24 mb-3.5 rounded-full p-1 bg-gradient-to-b from-zinc-700 to-zinc-900 group-hover:from-cyan-500 group-hover:to-blue-600 transition-all duration-500 cursor-pointer shadow-lg"
         >
-          {/* Shutter Layer (Expands from center out on hover) */}
-          <div className="absolute inset-0 scale-0 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-500 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-100" />
-          
-          {/* Inner Content Container */}
-          <div className="relative w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-zinc-600 group-hover:text-cyan-400 transition-colors duration-300 z-10">
-              {activeCreator.avatar
-                ? <img src={activeCreator.avatar} alt="" className="h-full w-full rounded-full object-cover" />
-                : <TrendingUp size={26} />}
+          <div className="w-full h-full rounded-full bg-zinc-950 overflow-hidden flex items-center justify-center">
+            {creator?.avatar ? (
+              <img 
+                src={creator.avatar} 
+                alt={creator?.name || ""} 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+              />
+            ) : (
+              <User2 size={32} className="text-zinc-500 group-hover:text-cyan-400 transition-colors" />
+            )}
           </div>
         </button>
 
         <h3
-          onClick={() => activeCreator.id && navigate(`/creator/${activeCreator.id}`)}
-          className="cursor-pointer text-white font-semibold text-sm tracking-wide truncate group-hover:text-cyan-300 transition-colors"
+          onClick={handleNavigate}
+          className="cursor-pointer text-white font-bold text-base tracking-tight truncate max-w-full group-hover:text-cyan-400 transition-colors"
         >
-          {activeCreator.name}
+          {creator?.name || "Anonymous Creator"}
         </h3>
-        <p className="text-zinc-500 text-[11px] mt-0.5 mb-4 all-font">
-          {activeCreator.handle}
+        <p className="text-zinc-500 text-xs mt-0.5 font-medium truncate max-w-full">
+          {creator?.handle || "@creator"}
         </p>
       </div>
 
-      {/* Conditional Action Button */}
+      {/* Action Button */}
       <button 
         onClick={toggleSubscription}
-        disabled={isUpdating}
-        className={`w-full py-2 text-xs font-medium rounded-xl border transition-all duration-300 active:scale-[0.98] ${
+        disabled={isLoading}
+        className={`w-full py-2.5 px-4 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 z-10 cursor-pointer ${
           isFollowing
-            ? 'bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:text-cyan-400 hover:border-cyan-500/40'
-            : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-black'
-        }`}
+            ? 'bg-zinc-800/90 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 hover:text-red-400 hover:border-red-500/30'
+            : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-black shadow-lg shadow-cyan-500/10'
+        } ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
       >
-        {isFollowing ? 'Unfollow' : 'Follow'}
+        {isFollowing ? (
+          <>
+            <Check size={14} className="stroke-[2.5]" />
+            <span>Following</span>
+          </>
+        ) : (
+          <>
+            <UserPlus size={14} className="stroke-[2.5]" />
+            <span>Follow</span>
+          </>
+        )}
       </button>
-      {error && <p role="alert" className="mt-2 text-center text-[10px] text-red-300">{error}</p>}
     </motion.div>
   );
 }

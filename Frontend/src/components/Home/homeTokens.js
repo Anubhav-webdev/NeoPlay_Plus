@@ -12,10 +12,10 @@ export const C = {
   mutedDark: "#4B5165",
 };
 
-export const FONT_DISPLAY = "'Bebas Neue', sans-serif";
+export const FONT_DISPLAY = "Lobster Two";
 export const TICKER_TOP = [
   "#TrendingNow",
-  "#NeoPlayPlus",
+  "NeoPlayPlus",
   "#CreatorHub",
   "#PulseFeed",
   "#NeoShots",

@@ -1,52 +1,38 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-
-async function readApiResponse(response) {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(body.message || `Request failed (${response.status})`);
-  }
-  return body;
-}
+import { publicApiFetch } from "./mediaApi.js";
 
 export async function getPublishedContent(type, { signal, creatorId } = {}) {
   const query = new URLSearchParams({ limit: "50" });
   if (type) query.set("type", type);
   if (creatorId) query.set("creatorId", creatorId);
-  const response = await fetch(`${API_BASE_URL}/content?${query}`, { signal });
-  const result = await readApiResponse(response);
+  const result = await publicApiFetch(`/content?${query}`, { signal });
   return result.data.items;
 }
 
 export async function getPublishedContentById(contentId, { signal } = {}) {
-  const response = await fetch(
-    `${API_BASE_URL}/content/${encodeURIComponent(contentId)}`,
+  const result = await publicApiFetch(
+    `/content/${encodeURIComponent(contentId)}`,
     { signal },
   );
-  const result = await readApiResponse(response);
   return result.data.content;
 }
 
 export async function recordPublishedContentView(contentId) {
-  const response = await fetch(
-    API_BASE_URL + "/content/" + encodeURIComponent(contentId) + "/view",
+  const result = await publicApiFetch(
+    `/content/${encodeURIComponent(contentId)}/view`,
     { method: "POST" },
   );
-  const result = await readApiResponse(response);
   return result.data.viewCount;
 }
 
 export async function getPublishedCreators({ signal } = {}) {
-  const response = await fetch(`${API_BASE_URL}/creators?limit=50`, { signal });
-  const result = await readApiResponse(response);
+  const result = await publicApiFetch("/creators?limit=50", { signal });
   return result.data.creators;
 }
 
 export async function getPublishedCreatorById(creatorId, { signal } = {}) {
-  const response = await fetch(
-    `${API_BASE_URL}/creators/${encodeURIComponent(creatorId)}`,
+  const result = await publicApiFetch(
+    `/creators/${encodeURIComponent(creatorId)}`,
     { signal },
   );
-  const result = await readApiResponse(response);
   return result.data.creator;
 }

@@ -79,6 +79,7 @@ export default function SubscriptionsDashboard() {
           ...creator,
           id: creator._id,
           name: creator.displayName,
+          subscriberCount: creator.subscriberCount || 0,
         })));
         const creatorContent = await Promise.all(
           subscribedCreators.map((creator) =>

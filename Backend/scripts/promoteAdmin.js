@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 import "../config/env.js";
 import { DB_NAME } from "../Constents.js";
 import User from "../models/users.js";
+import {
+  findAdminByIdentifier,
+  promoteUserToAdmin,
+} from "../services/adminDataService.js";
 
 const [emailArgument, confirmation] = process.argv.slice(2);
 const email = String(emailArgument || "").trim().toLowerCase();
@@ -17,16 +21,18 @@ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || confirmation !== "--confirm") {
 } else {
   try {
     await mongoose.connect(`${process.env.DB_URL}/${DB_NAME}`);
-    const user = await User.findOne({ email }).select("_id email role");
-    if (!user) {
-      console.error(`No account found for ${email}. Create the account first.`);
-      process.exitCode = 1;
-    } else if (user.role === "admin") {
+    const existingAdmin = await findAdminByIdentifier(email);
+    if (existingAdmin) {
       console.log(`${email} already has the admin role.`);
     } else {
-      user.role = "admin";
-      await user.save();
-      console.log(`Admin role granted to ${email}.`);
+      const user = await User.findOne({ email }).select("_id email");
+      if (!user) {
+        console.error(`No account found for ${email}. Create the account first.`);
+        process.exitCode = 1;
+      } else {
+        const admin = await promoteUserToAdmin(user._id);
+        console.log(`Admin role granted to ${admin.email}.`);
+      }
     }
   } catch (error) {
     console.error("Could not update the account role:", error.message);

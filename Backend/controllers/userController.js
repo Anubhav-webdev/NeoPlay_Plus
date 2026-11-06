@@ -4,6 +4,8 @@ import path from "node:path";
 import { fileTypeFromFile } from "file-type";
 import sharp from "sharp";
 import User from "../models/users.js";
+import Admin from "../models/Admin.js";
+import { updateAdminIdentity } from "../services/adminDataService.js";
 import { mediaConfig } from "../config/media.js";
 import { deleteCloudinaryAsset, uploadBuffer } from "../services/cloudinaryService.js";
 import ApiError from "../utils/ApiError.js";
@@ -51,8 +53,21 @@ export const updateProfile = asyncHandler(async (req, res) => {
   if (!Object.keys(updates).length)
     throw new ApiError(400, "No profile fields provided");
 
+  if (req.user.isAdminAccount) {
+    try {
+      const user = await updateAdminIdentity(req.user._id, updates);
+      if (!user) throw new ApiError(404, "Admin account not found");
+      return sendResponse(res, 200, "Profile updated", { user });
+    } catch (error) {
+      if (error.code === "DUPLICATE_ADMIN_IDENTITY") {
+        throw new ApiError(409, error.message);
+      }
+      throw error;
+    }
+  }
+
   const user = await User.findByIdAndUpdate(req.user._id, updates, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
     select:
       "_id name username email phoneNumber role avatar isVerified createdAt updatedAt",
@@ -89,7 +104,8 @@ export const uploadUserAvatar = asyncHandler(async (req, res) => {
       resourceType: "image",
       tags: ["neoplay-user-profile", "avatar"],
     });
-    const user = await User.findById(req.user._id).select("+avatarPublicId");
+    const Account = req.user.isAdminAccount ? Admin : User;
+    const user = await Account.findById(req.user._id).select("+avatarPublicId");
     if (!user) throw new ApiError(404, "User account not found");
     const previousPublicId = user.avatarPublicId;
     user.avatar = uploadedAsset.secure_url;
@@ -101,7 +117,9 @@ export const uploadUserAvatar = asyncHandler(async (req, res) => {
         console.error("Could not remove replaced user avatar", { userId: user.id, error });
       });
     }
-    const result = user.toObject();
+    const result = req.user.isAdminAccount
+      ? { ...req.user, avatar: user.avatar }
+      : user.toObject();
     delete result.avatarPublicId;
     return sendResponse(res, 200, "Profile image updated", { user: result });
   } finally {

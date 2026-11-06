@@ -301,16 +301,16 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
           className="w-full h-full object-contain bg-black"
           onClick={handleTogglePlay}
           onDoubleClick={handleToggleFullscreen}
-          onLoadedMetadata={(e) => setDuration(e.target.duration)}
+          onLoadedMetadata={(e) => {
+            setDuration(e.currentTarget.duration);
+            lastProgressSaveRef.current = e.currentTarget.currentTime;
+          }}
           onTimeUpdate={(e) => {
             const playedSeconds = e.currentTarget.currentTime;
             const totalSeconds = e.currentTarget.duration;
             setCurrentTime(playedSeconds);
-            if (
-              Number.isFinite(totalSeconds) && totalSeconds > 0 &&
-              (playedSeconds - lastProgressSaveRef.current >= 15 ||
-                (totalSeconds - playedSeconds <= 2 && totalSeconds - lastProgressSaveRef.current > 2))
-            ) {
+            if (Number.isFinite(totalSeconds) && totalSeconds > 0 &&
+              playedSeconds - lastProgressSaveRef.current >= 10) {
               lastProgressSaveRef.current = playedSeconds;
               onPlaybackProgress?.(Math.min(100, Math.round((playedSeconds / totalSeconds) * 100)));
             }
@@ -319,7 +319,14 @@ export default function VideoDetail({ video, onPlaybackStart, onPlaybackProgress
             setIsPlaying(true);
             onPlaybackStart?.();
           }}
-          onPause={() => setIsPlaying(false)}
+          onPause={(e) => {
+            setIsPlaying(false);
+            const { currentTime: playedSeconds, duration: totalSeconds } = e.currentTarget;
+            if (Number.isFinite(totalSeconds) && totalSeconds > 0) {
+              lastProgressSaveRef.current = playedSeconds;
+              onPlaybackProgress?.(Math.min(100, Math.round((playedSeconds / totalSeconds) * 100)));
+            }
+          }}
           onEnded={() => {
             onPlaybackProgress?.(100);
             setIsPlaying(false);

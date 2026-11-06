@@ -1,4 +1,5 @@
 import User from "../models/users.js";
+import Admin from "../models/Admin.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import sendResponse from "../utils/sendResponse.js";
@@ -10,6 +11,12 @@ import {
   verifyPassword,
   verifyRefreshToken,
 } from "../services/authService.js";
+import {
+  findAdminByIdentifier,
+  getAdminById,
+  hashAdminIdentifier,
+  toAdminPrincipal,
+} from "../services/adminDataService.js";
 
 const refreshCookieName = "neoplay_refresh";
 const refreshCookieOptions = {
@@ -36,8 +43,14 @@ function publicUser(user) {
 
 async function issueTokens(user, res) {
   const refreshToken = createRefreshToken(user);
-  user.refreshTokenHash = hashRefreshToken(refreshToken);
-  await user.save();
+  if (user.isAdminAccount) {
+    await Admin.findByIdAndUpdate(user._id, {
+      refreshTokenHash: hashRefreshToken(refreshToken),
+    });
+  } else {
+    user.refreshTokenHash = hashRefreshToken(refreshToken);
+    await user.save();
+  }
   res.cookie(refreshCookieName, refreshToken, refreshCookieOptions);
   return createAccessToken(user);
 }
@@ -77,14 +90,25 @@ export const signup = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Password must be between 8 and 128 characters");
   }
 
-  const duplicate = await User.findOne({
-    $or: [
-      { email: normalizedEmail },
-      { phoneNumber: normalizedPhone },
-      ...(normalizedUsername ? [{ username: normalizedUsername }] : []),
-    ],
-  });
-  if (duplicate)
+  const [duplicate, adminDuplicate] = await Promise.all([
+    User.findOne({
+      $or: [
+        { email: normalizedEmail },
+        { phoneNumber: normalizedPhone },
+        ...(normalizedUsername ? [{ username: normalizedUsername }] : []),
+      ],
+    }),
+    Admin.exists({
+      $or: [
+        { emailLookup: hashAdminIdentifier(normalizedEmail) },
+        { phoneLookup: hashAdminIdentifier(normalizedPhone) },
+        ...(normalizedUsername
+          ? [{ usernameLookup: hashAdminIdentifier(normalizedUsername) }]
+          : []),
+      ],
+    }),
+  ]);
+  if (duplicate || adminDuplicate)
     throw new ApiError(409, "Email, phone, or username is already registered");
 
   const user = await User.create({
@@ -114,10 +138,28 @@ export const login = asyncHandler(async (req, res) => {
   if (!identifier || typeof password !== "string" || password.length > 128) {
     throw new ApiError(400, "Identifier and password are required");
   }
+  const admin = await findAdminByIdentifier(identifier, {
+    includeSecrets: true,
+  });
+  if (admin && (await verifyPassword(password, admin.passwordHash))) {
+    const user = toAdminPrincipal(admin);
+    const accessToken = await issueTokens(user, res);
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      user: publicUser(user),
+      accessToken,
+    });
+  }
+
   const user = await User.findOne({
     $or: [{ email: identifier }, { username: identifier }],
   }).select("+passwordHash");
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (
+    !user ||
+    user.role === "admin" ||
+    !(await verifyPassword(password, user.passwordHash))
+  ) {
     throw new ApiError(401, "Invalid email/username or password");
   }
 
@@ -143,8 +185,14 @@ export const refresh = asyncHandler(async (req, res) => {
   }
   if (payload.type !== "refresh")
     throw new ApiError(401, "Invalid refresh token");
-  const user = await User.findById(payload.sub).select("+refreshTokenHash");
-  if (!user || user.refreshTokenHash !== hashRefreshToken(token)) {
+  const admin = await getAdminById(payload.sub, { includeSecrets: true });
+  const user = admin
+    ? toAdminPrincipal(admin)
+    : await User.findById(payload.sub).select("+refreshTokenHash");
+  const refreshTokenHash = admin
+    ? admin.refreshTokenHash
+    : user?.refreshTokenHash;
+  if (!user || refreshTokenHash !== hashRefreshToken(token)) {
     throw new ApiError(401, "Refresh token has been revoked");
   }
 
@@ -165,7 +213,9 @@ export const logout = asyncHandler(async (req, res) => {
       // An expired token is already unusable; clearing its cookie completes logout.
     }
     if (payload?.type === "refresh") {
-      await User.findByIdAndUpdate(payload.sub, {
+      const admin = await Admin.exists({ _id: payload.sub });
+      const model = admin ? Admin : User;
+      await model.findByIdAndUpdate(payload.sub, {
         $unset: { refreshTokenHash: 1 },
       });
     }
